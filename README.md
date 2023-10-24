@@ -1,2 +1,2 @@
-# pds-pdsparser
+# rms-pdsparser
 pdsparser Python module
