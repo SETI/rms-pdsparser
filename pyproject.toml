@@ -9,12 +9,6 @@ description = "Routines for parsing PDS3 labels"
 readme = "README.md"
 requires-python = ">=3.7"
 dependencies = [
-  "pds-julian",
-  "rms-pdsparser",
-
-    "numpy",
-    "pyparsing",
-    "rms-textkernel"
 ]
 license = {text = "Apache-2.0"}
 maintainers = [
