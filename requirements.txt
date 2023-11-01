@@ -1,1 +1,3 @@
 coverage
+pyparsing
+pytest

@@ -59,6 +59,7 @@
 ################################################################################
 
 from pyparsing import *
+del __author__ # Imported from pyparsing
 import decimal as dec
 import datetime as dt
 import sys

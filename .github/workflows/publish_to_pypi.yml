@@ -25,7 +25,7 @@ jobs:
 
       # - name: Test
       #   run: |
-      #     python -m unittest pdsparser
+      #     python -m pytest
 
       - name: Build
         run: |
