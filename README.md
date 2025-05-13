@@ -1,6 +1,7 @@
 [![GitHub release; latest by date](https://img.shields.io/github/v/release/SETI/rms-pdsparser)](https://github.com/SETI/rms-pdsparser/releases)
 [![GitHub Release Date](https://img.shields.io/github/release-date/SETI/rms-pdsparser)](https://github.com/SETI/rms-pdsparser/releases)
 [![Test Status](https://img.shields.io/github/actions/workflow/status/SETI/rms-pdsparser/run-tests.yml?branch=main)](https://github.com/SETI/rms-pdsparser/actions)
+[![Documentation Status](https://readthedocs.org/projects/rms-starcat/badge/?version=latest)](https://rms-starcat.readthedocs.io/en/latest/?badge=latest)
 [![Code coverage](https://img.shields.io/codecov/c/github/SETI/rms-pdsparser/main?logo=codecov)](https://codecov.io/gh/SETI/rms-pdsparser)
 <br />
 [![PyPI - Version](https://img.shields.io/pypi/v/rms-pdsparser)](https://pypi.org/project/rms-pdsparser)
@@ -21,7 +22,7 @@
 [![Number of GitHub stars](https://img.shields.io/github/stars/SETI/rms-pdsparser)](https://github.com/SETI/rms-pdsparser/stargazers)
 ![GitHub forks](https://img.shields.io/github/forks/SETI/rms-pdsparser)
 
-# pdsparser
+# Introduction
 
 `pdsparser` is a Python module that reads a PDS3 label file and converts its entire
 content to a Python dictionary.
@@ -32,16 +33,18 @@ It is supported by the PDS Ring-Moon Systems Node, SETI Institute.
 # Installation
 
 The `pdsparser` module is available via the `rms-pdsparser` package on PyPI and can be
-installed with::
+installed with:
 
-        pip install rms-pdsparser
+```sh
+pip install rms-pdsparser
+```
 
 # Getting Started
 
-The typical way to use this is as follows::
+The typical way to use this is as follows:
 
-        from pdsparser import PdsLabel
-        label = PdsLabel(label_path)
+    from pdsparser import PdsLabel
+    label = PdsLabel(label_path)
 
 where `label_path` is the path to a PDS3 label file or a data file containing an attached
 PDS3 label. The returned object `label` is an object of class
@@ -52,82 +55,82 @@ which supports the Python dictionary API and provides access to the content of t
 
 Suppose this is the content of a PDS3 label:
 
-        PDS_VERSION_ID                  = PDS3
-        RECORD_TYPE                     = FIXED_LENGTH
-        RECORD_BYTES                    = 2000
-        FILE_RECORDS                    = 1001
-        ^VICAR_HEADER                   = ("C3450702_GEOMED.IMG", 1)
-        ^IMAGE                          = ("C3450702_GEOMED.IMG", 2)
-    
-        /* Image Description  */
-    
-        INSTRUMENT_HOST_NAME            = "VOYAGER 1"
-        IMAGE_TIME                      = 1980-10-29T09:58:10.00
-        FILTER_NAME                     = "VIOLET"
-        EXPOSURE_DURATION               = 1.920 <SECOND>
-    
-        DESCRIPTION                     = "This image is the result of geometrically
-        correcting the corresponding CALIB image (C3450702_CALIB.IMG)."
-    
-        OBJECT                          = VICAR_HEADER
-          HEADER_TYPE                   = VICAR
-          BYTES                         = 2000
-          RECORDS                       = 1
-          INTERCHANGE_FORMAT            = ASCII
-          DESCRIPTION                   = "VICAR format label for the image."
-        END_OBJECT                      = VICAR_HEADER
-    
-        OBJECT                          = IMAGE
-          LINES                         = 1000
-          LINE_SAMPLES                  = 1000
-          SAMPLE_TYPE                   = LSB_INTEGER
-          SAMPLE_BITS                   = 16
-          BIT_MASK                      = 16#7FFF#
-        END_OBJECT                      = IMAGE
-        END
+    PDS_VERSION_ID                  = PDS3
+    RECORD_TYPE                     = FIXED_LENGTH
+    RECORD_BYTES                    = 2000
+    FILE_RECORDS                    = 1001
+    ^VICAR_HEADER                   = ("C3450702_GEOMED.IMG", 1)
+    ^IMAGE                          = ("C3450702_GEOMED.IMG", 2)
+
+    /* Image Description  */
+
+    INSTRUMENT_HOST_NAME            = "VOYAGER 1"
+    IMAGE_TIME                      = 1980-10-29T09:58:10.00
+    FILTER_NAME                     = "VIOLET"
+    EXPOSURE_DURATION               = 1.920 <SECOND>
+
+    DESCRIPTION                     = "This image is the result of geometrically
+    correcting the corresponding CALIB image (C3450702_CALIB.IMG)."
+
+    OBJECT                          = VICAR_HEADER
+      HEADER_TYPE                   = VICAR
+      BYTES                         = 2000
+      RECORDS                       = 1
+      INTERCHANGE_FORMAT            = ASCII
+      DESCRIPTION                   = "VICAR format label for the image."
+    END_OBJECT                      = VICAR_HEADER
+
+    OBJECT                          = IMAGE
+      LINES                         = 1000
+      LINE_SAMPLES                  = 1000
+      SAMPLE_TYPE                   = LSB_INTEGER
+      SAMPLE_BITS                   = 16
+      BIT_MASK                      = 16#7FFF#
+    END_OBJECT                      = IMAGE
+    END
 
 This will be the returned dictionary:
 
-        {'PDS_VERSION_ID': 'PDS3',
-         'RECORD_TYPE': 'FIXED_LENGTH',
-         'RECORD_BYTES': 2000,
-         'FILE_RECORDS': 1001,
-         '^VICAR_HEADER': 'C3450702_GEOMED.IMG',
-         '^VICAR_HEADER_offset': 1,
-         '^VICAR_HEADER_unit': '',
-         '^IMAGE': 'C3450702_GEOMED.IMG',
-         '^IMAGE_offset': 1000,
-         '^IMAGE_unit': '<BYTES>',
-         'INSTRUMENT_HOST_NAME': 'VOYAGER 1',
-         'INSTRUMENT_HOST_NAME': 'VG1',
-         'IMAGE_TIME': datetime.datetime(1980, 10, 29, 9, 58, 10),
-         'IMAGE_TIME_day': -7003,
-         'IMAGE_TIME_sec': 35890.0,
-         'IMAGE_TIME_fmt': '1980-10-29T09:58:10.000',
-         'FILTER_NAME': 'VIOLET',
-         'EXPOSURE_DURATION': 1.92,
-         'EXPOSURE_DURATION_unit': '<SECOND>',
-         'DESCRIPTION': 'This image is the result of geometrically\n
-        correcting the corresponding CALIB image (C3450702_CALIB.IMG).',
-         'DESCRIPTION_unwrap': 'This image is the result of geometrically correcting the corresponding CALIB image (C3450702_CALIB.IMG).',
-         'VICAR_HEADER': {'OBJECT': 'VICAR_HEADER',
-                          'HEADER_TYPE': 'VICAR',
-                          'BYTES': 2000,
-                          'RECORDS': 1,
-                          'INTERCHANGE_FORMAT': 'ASCII',
-                          'DESCRIPTION': 'VICAR format label for the image.',
-                          'END_OBJECT': 'VICAR_HEADER'},
-         'IMAGE': {'OBJECT': 'IMAGE',
-                   'LINES': 1000,
-                   'LINE_SAMPLES': 1000,
-                   'SAMPLE_TYPE': 'LSB_INTEGER',
-                   'SAMPLE_BITS': 16,
-                   'BIT_MASK': 32767,
-                   'BIT_MASK_radix': 16,
-                   'BIT_MASK_digits': '7FFF',
-                   'BIT_MASK_fmt': '16#7FFF#',
-                   'END_OBJECT': 'IMAGE'},
-         'END': ''}
+    {'PDS_VERSION_ID': 'PDS3',
+      'RECORD_TYPE': 'FIXED_LENGTH',
+      'RECORD_BYTES': 2000,
+      'FILE_RECORDS': 1001,
+      '^VICAR_HEADER': 'C3450702_GEOMED.IMG',
+      '^VICAR_HEADER_offset': 1,
+      '^VICAR_HEADER_unit': '',
+      '^IMAGE': 'C3450702_GEOMED.IMG',
+      '^IMAGE_offset': 1000,
+      '^IMAGE_unit': '<BYTES>',
+      'INSTRUMENT_HOST_NAME': 'VOYAGER 1',
+      'INSTRUMENT_HOST_NAME': 'VG1',
+      'IMAGE_TIME': datetime.datetime(1980, 10, 29, 9, 58, 10),
+      'IMAGE_TIME_day': -7003,
+      'IMAGE_TIME_sec': 35890.0,
+      'IMAGE_TIME_fmt': '1980-10-29T09:58:10.000',
+      'FILTER_NAME': 'VIOLET',
+      'EXPOSURE_DURATION': 1.92,
+      'EXPOSURE_DURATION_unit': '<SECOND>',
+      'DESCRIPTION': 'This image is the result of geometrically\n
+    correcting the corresponding CALIB image (C3450702_CALIB.IMG).',
+      'DESCRIPTION_unwrap': 'This image is the result of geometrically correcting the corresponding CALIB image (C3450702_CALIB.IMG).',
+      'VICAR_HEADER': {'OBJECT': 'VICAR_HEADER',
+                      'HEADER_TYPE': 'VICAR',
+                      'BYTES': 2000,
+                      'RECORDS': 1,
+                      'INTERCHANGE_FORMAT': 'ASCII',
+                      'DESCRIPTION': 'VICAR format label for the image.',
+                      'END_OBJECT': 'VICAR_HEADER'},
+      'IMAGE': {'OBJECT': 'IMAGE',
+                'LINES': 1000,
+                'LINE_SAMPLES': 1000,
+                'SAMPLE_TYPE': 'LSB_INTEGER',
+                'SAMPLE_BITS': 16,
+                'BIT_MASK': 32767,
+                'BIT_MASK_radix': 16,
+                'BIT_MASK_digits': '7FFF',
+                'BIT_MASK_fmt': '16#7FFF#',
+                'END_OBJECT': 'IMAGE'},
+      'END': ''}
 
 As you can see:
 
@@ -161,30 +164,30 @@ Within `TABLE` and `SPREADSHEET` objects, the dictionary keys of the embedded `C
 using repeated keywords `COLUMN`, `COLUMN_2`, `COLUMN_3`, etc.). For example, suppose this
 appears in a PDS3 label:
 
-        OBJECT = TABLE
-          OBJECT = COLUMN
-            NAME = VOLUME_ID
-            START_BYTE = 1
-          END_OBJECT = COLUMN
-          OBJECT = COLUMN
-            NAME = FILE_SPECIFICATION_NAME
-            START_BYTE = 15
-          END_OBJECT = COLUMN
-        END_OBJECT = TABLE
-    
-The returned section of the dictionary will look like this::
+    OBJECT = TABLE
+      OBJECT = COLUMN
+        NAME = VOLUME_ID
+        START_BYTE = 1
+      END_OBJECT = COLUMN
+      OBJECT = COLUMN
+        NAME = FILE_SPECIFICATION_NAME
+        START_BYTE = 15
+      END_OBJECT = COLUMN
+    END_OBJECT = TABLE
 
-        {'TABLE': {'OBJECT': 'TABLE',
-                   'VOLUME_ID': {'OBJECT': 'COLUMN',
-                                 'NAME': 'VOLUME_ID',
-                                 'START_BYTE': 1,
-                                 'END_OBJECT': 'COLUMN'},
-                   'FILE_SPECIFICATION_NAME': {'OBJECT': 'COLUMN',
-                                               'NAME': 'FILE_SPECIFICATION_NAME',
-                                               'START_BYTE': 15,
-                                               'END_OBJECT': 'COLUMN'},
-                   'END_OBJECT': 'TABLE'},
-        }
+The returned section of the dictionary will look like this:
+
+    {'TABLE': {'OBJECT': 'TABLE',
+                'VOLUME_ID': {'OBJECT': 'COLUMN',
+                              'NAME': 'VOLUME_ID',
+                              'START_BYTE': 1,
+                              'END_OBJECT': 'COLUMN'},
+                'FILE_SPECIFICATION_NAME': {'OBJECT': 'COLUMN',
+                                            'NAME': 'FILE_SPECIFICATION_NAME',
+                                            'START_BYTE': 15,
+                                            'END_OBJECT': 'COLUMN'},
+                'END_OBJECT': 'TABLE'},
+    }
 
 # Example 3
 
@@ -192,7 +195,7 @@ The returned section of the dictionary will look like this::
 "sequence" notation (using parentheses `()`) was meant. For example, this might appear in
 a label:
 
-        CUTOUT_WINDOW = {1, 1, 200, 800}
+    CUTOUT_WINDOW = {1, 1, 200, 800}
 
 which is supposed to define the four boundaries of an image region. The user might be
 surprised to learn that in the dictionary, its value is the Python set `{1, 200, 800}`. To
@@ -200,12 +203,12 @@ address this situation, for every set value, the dictionary also has a key with 
 name but suffix `_list`, which contains the elements of the value as list in their
 original order and including duplicates. In this example, the dictionary contains:
 
-        {'CUTOUT_WINDOW': {1, 200, 800},
-         'CUTOUT_WINDOW_list': [1, 1, 200, 800]}
+    {'CUTOUT_WINDOW': {1, 200, 800},
+      'CUTOUT_WINDOW_list': [1, 1, 200, 800]}
 
 # Options
 
-The 
+The
 `PdsLabel`[![image](https://raw.githubusercontent.com/SETI/rms-pdsparser/main/icons/link.png)](https://rms-pdaparser.readthedocs.io/en/latest/module.html#__init__.PdsParser.__init__),
 constructor provides a variety of additional options for how to
 parse the label and present its content.
@@ -255,4 +258,3 @@ The `pdsparser` module provides several additional utilities for handling PDS3 l
 - `expand_structures`[![image](https://raw.githubusercontent.com/SETI/rms-pdsparser/main/icons/link.png)](https://rms-pdaparser.readthedocs.io/en/latest/module.html#_utils.expand_structures):
   Replaces any `^STRUCTURE` keywords in a label string
   with the content of the associated ".FMT" files.
-
