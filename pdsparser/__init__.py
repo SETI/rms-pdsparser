@@ -1,1537 +1,652 @@
-#!/usr/bin/python
-################################################################################
-# pdsparser.py
-#
-# Classes and methods to read, write and parse PDS labels.
-#
-# Mark R. Showalter, SETI Institute, November 2013
-#
-# 1/10 MRS - Original version
-#
-# 6/16/12 MRS - Added new methods as_dict() and as_python_value() to convert
-#   label contents to standard Python types; fixed a minor bug in PdsReal.
-#
-# 4/2/13 MRS - Revised the handling of PDS pointer objects by as_dict(), such
-#   that they return a tuple containing all the information required.
-#
-# 11/22/13 MRS - Added classes PdsSetPointer and PdsSequencePointer (and
-#   superclass PdsVectorPointer) to allow for a pointer to multiple file names.
-#   This is used widely in DOCUMENT objects comprising multiple files. Surprise!
-################################################################################
-# Tracking of comments has been stripped away.
-# Tracking of substring locations has been stripped away for simplicity.
-# This will need a lot of work if we eventually want to do more general writing
-# of labels, but it implements the complete grammar for reading.
-#
-# Mark's notes from earlier draft version...
-#
-# Structure generated supports basic dictionary-type indexing.
-#
-# Node objects contain a single record, except the opening lines of OBJECT and
-# GROUPs enclose their contents.
-#
-# Comments are attached to the item before them unless this is impossible (such
-# as due to intervening punctuation); then they are attached to the item after.
-#
-# Every PdsItem has indices in the string to where the information begins and
-# ends, as well as a pointer to the string.
-#
-# Every PdsItem has a possible "eol" object which could be a newline, short
-# comment or long comment. It also has a possible "eol_before" The only case of
-# eol_before is in a sequence or set where the comment occurs after a comma; in
-# this case, the comment is attached to the element that follows.
-#
-# PdsValues only have attached comments if they appear inside the gaps within
-# the definition, e.g., between a value and its units, or between the elements
-# of a sequence or set.
-#
-# Most comments are attached to statements instead. They are usually after the
-# value but can also appear before or after the equal sign.
-#
-# There is currently no organized way to locate comments except by an extensive
-# tree search.
-#
-# Still need an option to find and replace STRUCTURE pointers and re-parse.
-#
-# Changing the label will throw off all the string pointers!
-#
-# MRS, July 26, 2009
-################################################################################
+##########################################################################################
+# pdsparser/__init__.py
+##########################################################################################
+"""PDS Ring-Moon Systems Node, SETI Institute
 
-from pyparsing import *
-del __author__ # Imported from pyparsing
-import decimal as dec
+``pdsparser`` is a Python module that reads a PDS3 label file and converts its entire
+content to a Python dictionary.
+
+The typical way to use this is as follows::
+
+    from pdsparser import Pds3Label
+    label = Pds3Label(label_path)
+
+where `label_path` is the path to a PDS3 label file or a data file containing an attached
+PDS3 label. The returned object `label` is an object of class :class:`Pds3Label`, which
+supports the Python dictionary API and provides access to the content of the label.
+
+#########
+Example 1
+#########
+
+Suppose this is the content of a PDS3 label::
+
+    PDS_VERSION_ID                  = PDS3
+    RECORD_TYPE                     = FIXED_LENGTH
+    RECORD_BYTES                    = 2000
+    FILE_RECORDS                    = 1001
+    ^VICAR_HEADER                   = ("C3450702_GEOMED.IMG", 1)
+    ^IMAGE                          = ("C3450702_GEOMED.IMG", 2)
+
+    /* Image Description  */
+
+    INSTRUMENT_HOST_NAME            = "VOYAGER 1"
+    IMAGE_TIME                      = 1980-10-29T09:58:10.00
+    FILTER_NAME                     = "VIOLET"
+    EXPOSURE_DURATION               = 1.920 <SECOND>
+
+    DESCRIPTION                     = "This image is the result of geometrically
+    correcting the corresponding CALIB image (C3450702_CALIB.IMG)."
+
+    OBJECT                          = VICAR_HEADER
+      HEADER_TYPE                   = VICAR
+      BYTES                         = 2000
+      RECORDS                       = 1
+      INTERCHANGE_FORMAT            = ASCII
+      DESCRIPTION                   = "VICAR format label for the image."
+    END_OBJECT                      = VICAR_HEADER
+
+    OBJECT                          = IMAGE
+      LINES                         = 1000
+      LINE_SAMPLES                  = 1000
+      SAMPLE_TYPE                   = LSB_INTEGER
+      SAMPLE_BITS                   = 16
+      BIT_MASK                      = 16#7FFF#
+    END_OBJECT                      = IMAGE
+    END
+
+The returned dictionary will be as follows::
+
+    {'PDS_VERSION_ID': 'PDS3',
+     'RECORD_TYPE': 'FIXED_LENGTH',
+     'RECORD_BYTES': 2000,
+     'FILE_RECORDS': 1001,
+     '^VICAR_HEADER': 'C3450702_GEOMED.IMG',
+     '^VICAR_HEADER_offset': 1,
+     '^VICAR_HEADER_unit': '',
+     '^IMAGE': 'C3450702_GEOMED.IMG',
+     '^IMAGE_offset': 1000,
+     '^IMAGE_unit': '<BYTES>',
+     'INSTRUMENT_HOST_NAME': 'VOYAGER 1',
+     'INSTRUMENT_HOST_NAME': 'VG1',
+     'IMAGE_TIME': datetime.datetime(1980, 10, 29, 9, 58, 10),
+     'IMAGE_TIME_day': -7003,
+     'IMAGE_TIME_sec': 35890.0,
+     'IMAGE_TIME_fmt': '1980-10-29T09:58:10.000',
+     'FILTER_NAME': 'VIOLET',
+     'EXPOSURE_DURATION': 1.92,
+     'EXPOSURE_DURATION_unit': '<SECOND>',
+     'DESCRIPTION': 'This image is the result of geometrically\n
+    correcting the corresponding CALIB image (C3450702_CALIB.IMG).',
+     'DESCRIPTION_unwrap': 'This image is the result of geometrically correcting the
+    corresponding CALIB image (C3450702_CALIB.IMG).',
+     'VICAR_HEADER': {'OBJECT': 'VICAR_HEADER',
+                      'HEADER_TYPE': 'VICAR',
+                      'BYTES': 2000,
+                      'RECORDS': 1,
+                      'INTERCHANGE_FORMAT': 'ASCII',
+                      'DESCRIPTION': 'VICAR format label for the image.',
+                      'END_OBJECT': 'VICAR_HEADER'},
+     'IMAGE': {'OBJECT': 'IMAGE',
+               'LINES': 1000,
+               'LINE_SAMPLES': 1000,
+               'SAMPLE_TYPE': 'LSB_INTEGER',
+               'SAMPLE_BITS': 16,
+               'BIT_MASK': 32767,
+               'BIT_MASK_radix': 16,
+               'BIT_MASK_digits': '7FFF',
+               'BIT_MASK_fmt': '16#7FFF#',
+               'END_OBJECT': 'IMAGE'},
+     'END': ''}
+
+As you can see:
+
+* Most PDS3 label keywords become keys in the dictionary without change.
+* OBJECTs and GROUPs are converted to sub-dictionaries and are keyed by the value of the
+  PDS3 keyword. In this example, `label['VICAR_HEADER']['HEADER_TYPE']` returns 'VICAR'.
+* If a keyword is repeated at the top level or within an object or group, it receives a
+  suffix "_2", "_3", etc. to distinguish it.
+* If a value has units, there is an additional keyword in the dictionary with "_unit" as
+  a suffix, containing the name of the unit.
+* For text values that contain a newline, trailing blanks are suppressed. In addition, a
+  dictionary key with the suffix "_unwrap" contains the same text as full paragraphs
+  separated by newlines.
+* For a file pointer of the form `(filename, offset)` or `(filename, offset <BYTES>)`, the
+  keyed value is just the filename. The offset value provided with "_offset" appended to
+  the dictionary key, and the unit is provided with "_unit" appended to the key.
+* For based integers of the form "radix#digits#", the dictionary value is converted to an
+  integer. However, the radix and the digit string are provided using keys with the suffix
+  "_radix" and "_digits". Also, the key with suffix "_fmt" provides a full, PDS3-formatted
+  version of the value.
+* Dates and times are converted to Python datetime objects. However, additional dictionary
+  keys appear with the suffix "_day" for the day number relative to Janary 1, 2000; "_sec"
+  for the elapsed seconds within that day, and "_fmt" to provide an ISO-formatted
+  representation of the value.
+
+#########
+Example 2
+#########
+
+Within TABLE and SPREADSHEET objects, the dictionary keys of the embedded COLUMN,
+BIT_COLUMN, and FIELD objects are keyed by the value of the NAME keyword (rather than by
+using repeated keywords "COLUMN", "COLUMN_2", "COLUMN_3", etc.). For example, suppose this
+appears in a PDS3 label::
+
+    OBJECT = TABLE
+      OBJECT = COLUMN
+        NAME = VOLUME_ID
+        START_BYTE = 1
+      END_OBJECT = COLUMN
+      OBJECT = COLUMN
+        NAME = FILE_SPECIFICATION_NAME
+        START_BYTE = 15
+      END_OBJECT = COLUMN
+    END_OBJECT = TABLE
+
+The returned section of the dictionary will look like this::
+
+    {'TABLE': {'OBJECT': 'TABLE',
+               'VOLUME_ID': {'OBJECT': 'COLUMN',
+                             'NAME': 'VOLUME_ID',
+                             'START_BYTE': 1,
+                             'END_OBJECT': 'COLUMN'},
+               'FILE_SPECIFICATION_NAME': {'OBJECT': 'COLUMN',
+                                           'NAME': 'FILE_SPECIFICATION_NAME',
+                                           'START_BYTE': 15,
+                                           'END_OBJECT': 'COLUMN'},
+               'END_OBJECT': 'TABLE'},
+    }
+
+#########
+Example 3
+#########
+
+"Set" notation (using curly braces "{}") was sometimes mis-used in PDS3 labels where
+"sequence" notation (using parentheses "()") was meant. For example, this might appear in
+a label::
+
+    CUTOUT_WINDOW = {1, 1, 200, 800}
+
+which is supposed to define the four boundaries of an image region. The user might be
+surprised to learn that in the dictionary, its value is the Python set {1, 200, 800}. To
+address this situation, for every set value, the dictionary also has a key with the same
+name but suffix "_list", which contains the elements of the value as list in their
+original order and including duplicates.
+
+#######
+Options
+#######
+
+The :meth:`Pds3Label` constructor provides a variety of additional options for how to
+parse the label and present its content.
+
+* You can provide the label to be parsed as a string containing the label's content rather
+  than as a path to a file.
+* Use `types=True` to include the type of each keyword the file and interpret its content
+  (e.g., "integer", "based_integer", "text", "date_time", or "file_offset_pointer") in the
+  dictionary using the keyword plus suffix "_type".
+* Use `sources=True` to include the source text as extracted from the PDS3 label in the
+  dictionary using the keyword plus suffix "_source".
+* Use `expand=True` to insert the content of any referenced `^STRUCTURE` keywords into the
+  returned dictionary.
+* Use `vax=True` to read attached labels from old-style Vax variable-length record files.
+* Use the `repairs` to correct any known syntax errors in the label prior to parsing using
+  regular expressions.
+
+Three methods of parsing the label are provided.
+
+* `method="strict"` uses a strict implementation of the PDS3 syntax. It is sure to provide
+  accurate results, but can be rather slow. This method can also be used to validate the
+  syntax within a PDS3 label, because it will raise a SyntaxError if anything goes wrong.
+* `method="loose"` uses a variant of the "strict" method, in which allowance is made for
+  certain common syntax errors. Specifically,
+
+  * It allows slashes in file names and in text strings that are not quoted (e.g., 'N/A').
+  * It allows the value of `END_OBJECT` and `END_GROUP` to be absent, as long as they are
+    still properly paired with associated `OBJECT` and `GROUP` keywords.
+  * It allows time zone expressions (where were disallowed after the PDS2 standard).
+
+* `method="fast"` is a different and much faster (often 30x faster) parser, which takes
+  various "shortcuts" during the parsing. As a result, it may fail on occasions where the
+  other methods succeed, and it may not return correct results in the cases of some
+  oddly-formatted labels. However, it handles all the most common aspects of the PDS3
+  syntax correctly, and so may be a good choice when handling large numbers of labels.
+
+#########
+Utilities
+#########
+
+The `pdsparser` module provides several additional utilities for handling PDS3 labels.
+
+- :meth:`_utils.read_label`: Reads a PDS3 label from a file. Supports attached labels
+  within binary files.
+- :meth:`_utils.read_vax_binary_label`: Reads the attached PDS3 label from an old-style
+  Vax binary file that uses variable-length records.
+- :meth:`_utils.expand_structures`: Replaces any `^STRUCTURE` keywords in a label string
+  with the content of the associated ".FMT" files.
+"""
+
 import datetime as dt
-import sys
+import pathlib
+import re
+from filecache import FCPath
+from pyparsing import ParseException
 
 try:
     from ._version import __version__
-except ImportError as err:
+except ImportError:
     __version__ = 'Version unspecified'
 
+from ._utils import read_label, read_vax_binary_label, expand_structures, _unique_key
+from ._fast_dict import _fast_dict
+from ._PDS3_GRAMMAR import _PDS3_LABEL, _ALT_PDS3_LABEL, _Value
 
-# We need to specify encoding when we open labels in Python 3; we can't in
-# Python 2
-if sys.version_info >= (3,0):
-    ENCODING = {'encoding': 'latin-1'}  # Needed for open() of ASCII files
-else:
-    ENCODING = {}
+##########################################################################################
+# Pds3Label
+##########################################################################################
 
-################################################################################
-################################################################################
-# PdsNode
-################################################################################
-################################################################################
+class Pds3Label():
+    """Class representing the parsed content of a PDS3 label."""
 
-PARSE_NODES = []        # The current list of nodes in the parse hierarchy.
+    def __init__(self, label, method='strict', *, expand=False, fmt_dirs=[],
+                 repairs=[], vax=False, types=False, sources=False, _details=False):
+        """Constructor for a Pds3Label.
 
-class PdsNode(object):
-    """Class for any statement or node of a PDS parsing tree."""
+        Parameters:
+            label (str, list, pathlib.Path, or filecache.FCPath):
+                The label, defined as a path to a file or as the content of a label. The
+                content can be represented by a single string with <LF> or <CR><LF>
+                terminators, or as a list of strings with optional terminators. If the
+                file contains an attached PDS3 label, the label is read up to the END
+                statement and the remainder is ignored.
 
-    def __init__(self, parent=None):
-        self.parent = parent        # The parent of this node.
-        self.children = []          # If it's an object, the child nodes.
-        self.dict = {}              # A dictionary keyed by the keyword, object
-                                    # and group names.
+            method (str, optional):
+                The method of parsing to apply to the label. One of:
 
-        self.name = ""              # Name of keywords; values for OBJECTs or
-                                    # GROUPs.
-        self.type = ""              # "OBJECT", "GROUP", "ROOT", or "KEYWORD".
+                * "strict" performs strict parsing, which requires that the label conform
+                  to the full PDS3 standard.
+                * "loose" is similar to the above, but tolerates some common syntax
+                  errors.
+                * "fast": uses s a different parser, which executes ~ 30x fast than the
+                  above and handles all the most common aspects of the PDS3 standard.
+                  However, it is not guaranteed to provide an accurate parsing under all
+                  circumstances.
 
-        self.keyword = None         # PdsKeyword before equal sign.
-        self.pdsvalue = None        # PdsValue after equal sign.
+            expand (bool, optional):
+                True to replace the content of any ^STRUCTURE keyword in the label with
+                the content of the associated ".FMT" file.
+
+            fmt_dirs (str, pathlib.Path, filecache.FCPath, or list, optional):
+                One or more directory paths to search for ".FMT" files.
+
+            repairs (tuple or list[tuple]):
+                One or more two-element tuples of the form (pattern, replacement), where
+                the first item is a regular expression and the second is the string with
+                which to replace it. These repair patterns are applied to the label
+                content before it is parsed, and make it possible to repair known syntax
+                errors.  For example, this tuple uses a "negative look-behind" pattern
+                (?<!...) tow ensure that every occurrence of "N/A" is surrounded by
+                quotes::
+
+                    (r'(?<!["\\'])N/A', "'N/A'")
+
+                The `replacement` can include back-references ("\\1", "\\2", etc.) to
+                captured substrings of `tuple`; see any documentation about regular
+                expressions for more details.
+
+            vax (bool, optional):
+                True to read an attached label from a Vax binary file.
+
+            types (bool, optional):
+                If True, for each PDS keyword in the label, there will be an extra key in
+                the dictionary with the same name but suffix "_type" identifying the PDS3
+                data type, e.g., "integer", "based_integer", "text", "date_time",
+                "file_offset_pointer", etc.
+
+            sources (bool, optional):
+                If True, for each PDS keyword in the label, there will be an extra key in
+                the dictionary with the same name but suffix "_source" returning the
+                substring of the label from which this value was derived.
+
+            _details (bool, optional):
+                Used for debugging. If True, for each PDS keyword in the label, there will
+                be an extra key in the dictionary with the same name but suffix "_detail"
+                returning an object (of class internal to this module) containing details
+                about how the entry was parsed. Not provided if `fast=True`.
+
+        Attributes:
+            content (str): The full content of the label as a string with <LF> line
+                separators. If expand is True, this will be the expanded content, with any
+                ^STRUCTURE values replaced.
+            dict (dict): The actual dictionary containing all the label content. However,
+                note that most of the Python dictionary API is implemented directly by
+                this class, so label[keyword] is the same as label.dict[keyword].
+
+        Raises:
+            FileNotFoundError: If the label file is missing.
+            SyntaxError: If the label content contains invalid syntax.
+
+        Notes:
+            The label information is preserved as a dictionary using the value before
+            each equal sign as the key. If a keyword is repeated in the label, later
+            dictionary keys have a suffix "_2", "_3", etc.
+
+            OBJECT and GROUP elements are described by internal dictionaries, which are
+            organized the same as the overall label. The key for COLUMN and FIELD objects
+            is their NAME attribute; for others, it is the value after the equal sign in
+            the OBJECT or GROUP statement.
+
+            Numeric values are represented as ints or floats. If the value has a unit, the
+            unit value can be accessed by appending "_unit" to the key. Integers given
+            with a radix are provided as ints, but you can view the radix value and the
+            digit string by appending "_radix" and "_digits" to the key; in addition,
+            suffix "_fmt" returns the full formatted value using the radix notation.
+
+            Text strings are represented as Python str values. For those that extend
+            beyond a single line, you can append "_unwrap" to the key to get a version of
+            the text in which indents and newlines within paragraphs have been removed.
+
+            Dates, times, and date-times are all represented using classes of the python
+            datetime module. Dates and date-times have an additional dictionary entry
+            using suffix "_day" returning the elapsed days since January 1, 2000. Times
+            and date-times have an additional entry using suffix "_sec" returning the
+            number of elapsed seconds since the beginning of that day. In additiona, all
+            of these have an additional entry with suffix
+
+            Sequences are represented by lists. 2-D sequences are represented by list of
+            lists. Append "_unit" to the key to see any unit values that appeared within
+            the sequence; if all units are the same, the "_unit" suffix returns a single
+            value; otherwise, it returns a list or list of lists containing the unit
+            value associated with each value in the sequence.
+
+            Set values (enclosed in curly braces {}) are represented by Python set
+            objects. However, because this notation was sometimes mis-used in labels for
+            values that should have been given as sequences, you can also view these
+            values as an ordered list by appending "_list" to the key.
+
+            For pointers involving a filename and an offset, the keyword name in the label
+            returns the filename only; Append "_offset" to the key to get the offset and
+            "_unit" to get the unit, which is either "<BYTES>" or an empty string
+            (meaning the unit is records).
+        """
+
+        if method not in {'strict', 'loose', 'fast'}:
+            raise ValueError('invalid method: ' + repr(method))
+
+        self._filepath = ''
+        self._fast = (method == 'fast')
+        self.content = ''
+
+        # Interpret `label` input
+        if isinstance(label, list):
+            self.content = '\n'.join(rec.rstrip() for rec in label) + '\n'
+        elif isinstance(label, str):
+            # Is this a file path or a content string?
+            if '\n' in label:
+                self.content = label
+            else:
+                self._filepath = FCPath(label)
+        elif isinstance(label, (pathlib.Path, FCPath)):
+            self._filepath = FCPath(label)
+        else:
+            raise ValueError('invalid label')
+
+        # Read the label content if necessary
+        if self._filepath:
+            if vax:
+                self.content = read_vax_binary_label(self._filepath)
+            else:
+                self.content = read_label(self._filepath)
+
+        # Replace ^STRUCTURE if necessary
+        if expand:
+            self.content = expand_structures(self.content, fmt_dirs=fmt_dirs,
+                                             label_path=self._filepath)
+
+        # Repair content if necessary
+        if isinstance(repairs, tuple):
+            repairs = [repairs]
+        for repair in repairs:
+            self.content = re.sub(repair[0], repair[1], self.content)
+
+        # Parse label
+        if method == 'fast':
+            self.dict, self._statements = _fast_dict(self.content, types=types,
+                                                      sources=sources)
+        else:
+            try:
+                if method == 'strict':
+                    self._statements = _PDS3_LABEL.parse_string(self.content)
+                else:
+                    self._statements = _ALT_PDS3_LABEL.parse_string(self.content)
+            except ParseException as err:       # convert parse exception to SyntaxError
+                message = str(err)
+                if message[:2] == ', ':
+                    message = message[2:]
+                raise SyntaxError(message)
+
+            self.dict = self._python_dict(types=types, sources=sources, details=_details)
 
     def __str__(self):
-        return "".join(self.formatted_list(0))
 
-    def __repr__(self): return str(self)
+        indent = 0
+        result = []
+        for statement in self._statements:
+            if self._fast:
+                name, value = statement
+            else:
+                name = statement.name
+                value = statement.item and str(statement.item)
 
-    def formatted_list(self, indent):
+            if name in ('END_OBJECT', 'END_GROUP'):
+                indent -= 2
+            result += [indent * ' ', name]
+            if value is not None:
+                result += [' = ', value]
+            result.append('\n')
+            if name in ('OBJECT', 'GROUP'):
+                indent += 2
 
-        # If this is root, out-dent and just print the children
-        if (self.keyword is None and self.pdsvalue is None and
-            self.name == "ROOT"):
-                indent -= 1
-                result = []
-        else:
-            # Print the keyword, indented properly
-            result = indent * ["  "] + [str(self.keyword)]
+        return ''.join(result)
 
-            # Print the equal sign
-            result += [" = "]
+    def __repr__(self):
+        return str(self)
 
-            # Print the value
-            result += self.pdsvalue.formatted_list(indent + 1)
-
-        # Print each child statement indented
-        for c in self.children[:-1]:      # Stop before END_...
-            result += ["\n"] + c.formatted_list(indent + 1)
-
-        # Print the END_OBJECT/END_GROUP without indent if necessary
-        if len(self.children) > 0:
-            result += ["\n"] + self.children[-1].formatted_list(max(indent,0))
-
-        return result
-
+    # Implement the core dict interface
     def __getitem__(self, key):
-        if type(key) == type(0):
-            if self.children != []: return self.children[key]
-            else:                   return self.pdsvalue[key]
-        else:
-            if self.dict[key].children != []: return self.dict[key]
-            else:                             return self.dict[key].pdsvalue
+        return self.dict[key]
 
     def __len__(self):
-        if self.children != []: return len(self.children)
-        else:                   return len(self.pdsvalue)
-
-    @staticmethod
-    def parse(s, l, tokens):
-
-        global PARSE_NODES
-
-        struct = PdsNode(PARSE_NODES[-1])
-        struct.parent.children.append(struct)
-
-        # Locate extra EOLs around equal sign
-        struct.keyword = tokens[0]      # Keyword is always first
-        struct.pdsvalue = tokens[1]     # Value is always second
-
-        # This is an initial guess
-        struct.type = "KEYWORD"
-        struct.name = str(struct.keyword)
-
-        # If a new object or group begins, update the node list
-        if (struct.keyword.name == "OBJECT" or
-            struct.keyword.name == "GROUP"):
-
-            if (not isinstance(struct.pdsvalue, PdsText) or
-                struct.pdsvalue.quote != ""):
-                    raise SyntaxError('Invalid name for ' +
-                        struct.keyword.name + ": " + str(struct.pdsvalue))
-
-            struct.name = struct.pdsvalue.value
-            struct.type = struct.keyword.name
-
-            # Add the object/group to the parent's dictionary
-            struct.parent.dict[struct.name] = struct
-
-            # Add the new node to the current heirarchy
-            PARSE_NODES.append(struct)
-
-        # End of object or group...
-        elif (struct.keyword.name == "END_OBJECT" or
-              struct.keyword.name == "END_GROUP"):
-
-            # Make sure types match
-            if struct.keyword.name[4:] != PARSE_NODES[-1].type:
-                raise SyntaxError("Nesting mismatch: " + PARSE_NODES[-1].type +
-                        " vs. " + struct.keyword.name)
-
-            # Make sure identifier is valid
-            if (not isinstance(struct.pdsvalue, PdsText) or
-                struct.pdsvalue.quote):
-                    raise SyntaxError('Invalid name for END_' +
-                        struct.keyword.name + ": " + str(struct.pdsvalue))
-
-            # Make sure identifiers match
-            if PARSE_NODES[-1].name != struct.pdsvalue.value:
-                raise SyntaxError("Nesting mismatch: " + PARSE_NODES[-1].type +
-                        " " + PARSE_NODES[-1].name + " vs. " +
-                        struct.keyword.name + " " + struct.pdsvalue.value)
-
-            # Go back to the parent node
-            PARSE_NODES.pop()
-
-        # If this is still a keyword, add it to the parent's dictionary
-        else:
-            struct.parent.dict[struct.name] = struct
-
-        return
-
-    @staticmethod
-    def parse_end(s, l, tokens):
-
-        global PARSE_NODES
-
-        if len(PARSE_NODES) != 1:
-            raise SyntaxError("Un-terminated " + PARSE_NODES[-1].type + ": " +
-                PARSE_NODES[-1].name)
-
-    @staticmethod
-    def init_current_node():
-
-        global PARSE_NODES
-
-        PARSE_NODES = [PdsNode(None)]
-        PARSE_NODES[0].name = "ROOT"
-        PARSE_NODES[0].type = "ROOT"
-
-    def as_python_value(self):
-        """Returns the value of this node as a standard python class of int,
-        float, string, list, or dict. A dict is used to hold the contents of an
-        OBJECT or GROUP."""
-
-        if self.children == []: return self.pdsvalue.as_python_value()
-
-        dict = {}
-        for child in self.children:
-            key = child.name
-            if key in ("END_OBJECT", "END_GROUP", "END"): continue
-
-            # Key columns by the name rather than the non-unique "COLUMN"
-            if child.name == "COLUMN" and "NAME" in child.dict:
-                key = child.dict["NAME"].pdsvalue.value
-
-            dict[key] = child.as_python_value()
-
-        return dict
-
-################################################################################
-# PdsItem
-################################################################################
-
-class PdsItem(object):
-    """General class for any part of a PDS label."""
-
-################################################################################
-# BEGIN GRAMMAR
-################################################################################
-whites = " \t"
-ParserElement.setDefaultWhitespaceChars(whites)
-WHITE           = Word(whites)
-#-----------------------------------------------------------------------
-IDENTIFIER      = Combine(Word(alphas, alphanums + "_"))
-IDENTIFIER.setName("IDENTIFIER")
-#-----------------------------------------------------------------------
-newline         = "\n"
-NEWLINE         = Literal(newline)
-NEWLINE.setName("NEWLINE")
-#-----------------------------------------------------------------------
-COMMENT         = (Combine("/*" + CharsNotIn(newline)) +  NEWLINE)
-COMMENT.setName("COMMENT")
-#-----------------------------------------------------------------------
-EOL             = Suppress(COMMENT | NEWLINE)               # Order matters
-################################################################################
-################################################################################
-# PdsValue classes
-################################################################################
-################################################################################
-
-class PdsValue(PdsItem):
-    """The generic class for anything that can appear on the right side of an
-    equal sign in a PDS label."""
-
-    def __init__(self, value=None, parser=None):
-        PdsItem.__init__(self)
-        self.value = value      # A representation for the value of the object
-#         self.parser = parser    # Currently unused
-
-    # Default string is just a default formatting of the value
-    def __str__(self): return str(self.value)
-
-    def __repr__(self): return repr(self.value)
-
-    def formatted_list(self, indent): return str(self)
-
-    # Allow basic operations on PdsValue types
-    def __add__(self, other): return self.value + other
-    def __sub__(self, other): return self.value - other
-    def __mul__(self, other): return self.value * other
-    def __div__(self, other): return self.value / other
-
-    def __radd__(self, other): return other + self.value
-    def __rsub__(self, other): return other - self.value
-    def __rmul__(self, other): return other * self.value
-    def __rdiv__(self, other): return other / self.value
-
-    def __neg__(self): return -self.value
-    def __pos__(self): return +self.value
-
-    # Basic type conversions
-    def __int__(self): return int(self.value)
-    def __float__(self): return float(self.value)
-
-    def as_python_value(self):
-        """Returns the value of this item as a standard python class of int,
-        float, string, or list."""
-
-        # Default behavior is to return the value field. This is overridden by
-        # PdsVector and PdsPointer.
-        return self.value
-
-class PdsScalar(PdsValue):
-    """The generic class for any single value that can appear on the right side
-    of an equal sign in a PDS label."""
-
-class PdsNumber(PdsScalar):
-    """The generic class for any single numeric value that can appear on the
-    right side of an equal sign in a PDS label."""
-
-################################################################################
-# PdsInteger
-################################################################################
-SIGN            = oneOf("+ -")
-UNSIGNED_INT    = Word(nums)
-SIGNED_INT      = Combine(Optional(SIGN) + UNSIGNED_INT)
-
-INTEGER         = Combine(Optional(SIGN) + UNSIGNED_INT)
-INTEGER.setName("INTEGER")
-#-----------------------------------------------------------------------
-
-class PdsInteger(PdsNumber):
-    """An integer value."""
-
-    def __init__(self):
-        PdsValue.__init__(self, 0, INTEGER)
-
-    # Interpret parser tokens
-    @staticmethod
-    def parse(s, l, tokens):
-        return PdsInteger.from_int(int(tokens[0]))
-
-    # Create an object
-    @staticmethod
-    def from_int(value=0):
-        """Returns a PdsInteger given an int."""
-
-        struct = PdsInteger()
-        struct.value = value
-
-        return struct
-
-#-----------------------------------------------------------------------
-INTEGER.setParseAction(PdsInteger.parse)
-################################################################################
-# PdsBasedInteger
-################################################################################
-HEX_INT         = Word(hexnums)
-SIGNED_HEX_INT  = Combine(Optional(SIGN) + HEX_INT)
-BASED_INT       = (Suppress(Optional(WHITE))
-                +  UNSIGNED_INT
-                +  Suppress("#")
-                +  SIGNED_HEX_INT
-                +  Suppress("#"))
-BASED_INT.setWhitespaceChars("")
-BASED_INT.setName("BASED_INT")
-#-----------------------------------------------------------------------
-
-class PdsBasedInteger(PdsInteger):
-    """An integer value in an alternative radix 2-16."""
-
-    BASE_DIGITS = "0123456789ABCDEF"
-
-    def __init__(self):
-        PdsValue.__init__(self, 0, BASED_INT)
-
-        self.radix = 0          # The radix of the based integer
-        self.digits = ""        # The "digits" string of the based integer
-        self.sign = ""          # The optional sign character
-
-    def __str__(self):
-        return str(self.radix) + "#" + self.sign + self.digits + "#"
-
-    # Interpret parser tokens
-    @staticmethod
-    def parse(s, l, tokens):
-
-        radix = int(tokens[0])
-        (number, ndigits, use_plus) = PdsBasedInteger._number(tokens[1], radix)
-
-        struct = PdsBasedInteger.from_int(number, radix, ndigits, use_plus)
-        return struct
-
-    # Create an object
-    @staticmethod
-    def from_int(number, radix, mindigits=1, use_plus=False):
-        """Returns a new PdsBasedInteger given a number or string and a
-        radix."""
-
-        struct = PdsBasedInteger()
-
-        if number < 0:
-            struct.sign = "-"
-        elif use_plus:
-            struct.sign = "+"
-        else:
-            struct.sign = ""
-
-        struct.value = number
-        struct.radix = radix
-        struct.digits = PdsBasedInteger._digits(abs(number), radix, mindigits)
-        return struct
-
-    # Internal methods
-    @staticmethod
-    def _digits(number, radix, mindigits=1, use_plus=False):
-        """Converts a number to a string in the specified radix."""
-
-        if radix < 2 or radix > 16: raise ValueError("radix out of range")
-
-        is_neg = (number < 0)
-        number = abs(number)
-
-        result = ""
-        while number != 0:
-            number, digit = divmod(number, radix)
-            result = PdsBasedInteger.BASE_DIGITS[digit] + result
-
-        zeros = mindigits - len(result)
-        if zeros > 0: result = "0" * zeros + result
-
-        if is_neg:
-            result = "-" + result
-        elif use_plus:
-            result = "+" + result
-
-        return result
-
-    @staticmethod
-    def _number(digits, radix):
-        """Converts a string to a number given the specified radix."""
-
-        if radix < 2 or radix > 16: raise ValueError("radix out of range")
-
-        digits = digits.strip()
-
-        is_neg   = (digits[0] == "-")
-        use_plus = (digits[0] == "+")
-        if is_neg or use_plus: digits = digits[1:]
-
-        value = 0
-        for c in digits:
-            i = "0123456789ABCDEF".index(c.upper())
-            if i >= radix:
-                raise ValueError("Digits are incompatible with radix")
-
-            value = value * radix + i
-
-        if is_neg: value = -value
-
-        return (value, len(digits), use_plus)
-
-#-----------------------------------------------------------------------
-BASED_INT.setParseAction(PdsBasedInteger.parse)
-################################################################################
-# PdsReal
-################################################################################
-EXPONENT        = (oneOf("e E") + SIGNED_INT)
-REAL_WITH_INT   = Combine(SIGNED_INT
-                        + "."
-                        + Optional(UNSIGNED_INT)
-                        + Optional(EXPONENT))
-REAL_WO_INT     = Combine(Optional(SIGN)
-                        + "."
-                        + UNSIGNED_INT
-                        + Optional(EXPONENT))
-REAL_WO_DOT     = Combine(SIGNED_INT + EXPONENT)
-
-REAL_NUMBER     = (REAL_WITH_INT
-                ^  REAL_WO_INT
-                ^  REAL_WO_DOT)
-REAL_NUMBER.setName("REAL")
-#-----------------------------------------------------------------------
-
-class PdsReal(PdsNumber):
-    """A real (floating-point) number."""
-
-    def __init__(self):
-        PdsValue.__init__(self, 0., REAL_NUMBER)
-
-        self.decimal = None     # The value formatted as a decimal
-        self.string  = ""       # The value as a string
-
-    def __str__(self):
-        return str(self.decimal)
-
-    def __repr__(self):
-        return self.string
-
-    # Interpret parser tokens
-    @staticmethod
-    def parse(s, l, tokens):
-        struct = PdsReal()
-
-        struct.value = float(tokens[0])
-        struct.decimal = dec.Decimal(tokens[0])
-        struct.string = tokens[0]
-        return struct
-
-    @staticmethod
-    def from_value(value=0., format=""):
-        """Returns a PdsReal given a double or decimal."""
-
-        struct = PdsReal()
-        struct.value = float(value)
-
-        if type(value) == dec.Decimal:
-            struct.decimal = value
-            struct.string  = repr(value)
-        else:
-            struct.string = format % value
-            struct.decimal = dec.Decimal(struct.string)
-
-        return struct
-
-#-----------------------------------------------------------------------
-REAL_NUMBER.setParseAction(PdsReal.parse)
-#-----------------------------------------------------------------------
-NUMBER_WO_UNITS = REAL_NUMBER | BASED_INT | INTEGER     # Order matters here!
-################################################################################
-# PdsUnitsExpr
-################################################################################
-UNIT_EXPR     = Combine("<" + OneOrMore(CharsNotIn("\n >")) + ">")
-#-----------------------------------------------------------------------
-
-class PdsUnitExpr(PdsValue):
-    """A unit expression."""
-
-    def __init__(self):
-        PdsValue.__init__(self, "", UNIT_EXPR)
-
-    def __str__(self):
-        return "<" + self.value + ">"
-
-    @staticmethod
-    def parse(s, l, tokens):
-
-        struct = PdsUnitExpr()
-        struct.value = tokens[0][1:-1]
-
-        return struct
-
-#-----------------------------------------------------------------------
-UNIT_EXPR.setParseAction(PdsUnitExpr.parse)
-################################################################################
-# PdsNumberWithUnits
-################################################################################
-NUMBER_W_UNITS  = NUMBER_WO_UNITS + ZeroOrMore(EOL) + UNIT_EXPR
-NUMBER_W_UNITS.setName("NUMBER_W_UNITS")
-#-----------------------------------------------------------------------
-
-class PdsNumberWithUnits(PdsNumber):
-    """A number with units."""
-
-    def __init__(self):
-        PdsValue.__init__(self, 0., NUMBER_W_UNITS)
-        self.pdsnumber = None   # The associated PdsNumber object
-        self.pdsunits = None    # The PdsUnitExpr object
-
-    def __str__(self):
-        return str(self.pdsnumber) + " " + str(self.pdsunits)
-
-    # Interpret parser tokens
-    @staticmethod
-    def parse(s, l, tokens):
-
-        struct = PdsNumberWithUnits()
-        struct.pdsnumber = tokens[0]
-        struct.pdsunits  = tokens[1]
-        struct.value     = struct.pdsnumber.value
-
-        return struct
-
-#-----------------------------------------------------------------------
-NUMBER_W_UNITS.setParseAction(PdsNumberWithUnits.parse)
-#-----------------------------------------------------------------------
-NUMBER          = NUMBER_W_UNITS | NUMBER_WO_UNITS      # Order matters here!
-################################################################################
-# PdsTime: value is a string representation of the time
-################################################################################
-
-class PdsTime(PdsScalar): pass
-
-################################################################################
-# PdsHmsTime
-################################################################################
-HMS_TIME        = (UNSIGNED_INT
-                +  Suppress(":")
-                +  UNSIGNED_INT
-                +  Optional(Suppress(":")
-                         +  Combine(UNSIGNED_INT
-                                  + Optional("."
-                                  + Optional(UNSIGNED_INT)))))
-HMS_TIME.setWhitespaceChars("")
-HMS_TIME.setName("HMS_TIME")
-#-----------------------------------------------------------------------
-
-class PdsHmsTime(PdsTime):
-    """A time of day, excluding a time zone."""
-
-    def __init__(self):
-        PdsValue.__init__(self, "", HMS_TIME)
-        self.hour = 0
-        self.minute = 0
-        self.second = 0
-        self.elapsed = 0
-
-    def __str__(self):
-        result = "%02d" % self.hour + ":" + "%02d" % self.minute + ":"
-
-        if type(self.second) == type(0):
-            return result + "%02d" % self.second
-
-        if type(self.second) == type(dec.Decimal("0.")):
-            secstr = str(self.second)
-            if secstr[1] == ".": return result + "0" + secstr
-            if secstr[2] == ".": return result + secstr
-
-        return result + "%06.3f" % self.second
-
-    # Interpret parser tokens
-    @staticmethod
-    def parse(s, l, tokens):
-
-        if len(tokens) == 2:
-            struct = PdsHmsTime.from_hms(int(tokens[0]), int(tokens[1]), 0)
-            struct.index1 = l
-            return struct
-
-        try:
-            second = int(tokens[2])
-        except:
-            second = dec.Decimal(tokens[2])
-
-        struct = PdsHmsTime.from_hms(int(tokens[0]), int(tokens[1]), second)
-        return struct
-
-    @staticmethod
-    def from_hms(hour, minute, second=0):
-        """Returns a new PdsHmsTime given an hour, minute and optional second.
-        "The second can be int, float or decimal."""
-
-        struct = PdsHmsTime();
-
-        struct.hour = hour
-        struct.minute = minute
-        struct.second = second
-        struct.value = str(struct)
-        struct.elapsed = 3600 * hour + 60 * minute + second
-
-        if hour   < 0 or hour   > 23: raise ValueError("hour out of range")
-        if minute < 0 or minute > 59: raise ValueError("minute out of range")
-        if second < 0 or second > 60: raise ValueError("second out of range")
-
-        if second == 60 and (hour != 23 or minute != 59):
-            raise ValueError("second out of range")
-
-        return struct
-
-#-----------------------------------------------------------------------
-HMS_TIME.setParseAction(PdsHmsTime.parse)
-################################################################################
-# PdsTimeZone (used only internally): value is a string representation
-################################################################################
-TIME_ZONE       = ("Z"
-                ^ (SIGN
-                 + UNSIGNED_INT
-                 + Optional(Suppress(":") + UNSIGNED_INT)))
-TIME_ZONE.setWhitespaceChars("")
-TIME_ZONE.setName("TIME_ZONE")
-#-----------------------------------------------------------------------
-
-class PdsTimeZone(PdsValue):
-    """Internally-used class to represent a time zone."""
-
-    def __init__(self):
-        PdsValue.__init__(self, "", TIME_ZONE)
-        self.offset = 0         # minutes offset from GMT
-
-    # Interpret parser tokens
-    @staticmethod
-    def parse(s, l, tokens):
-
-        struct = PdsTimeZone()
-
-        if tokens[0] == "Z":
-            struct.value = "Z"
-            struct.offset = 0
-        else:
-            struct.value = tokens[0] + tokens[1]
-            struct.offset = 60 * int(tokens[1])
-
-            if len(tokens) > 2:
-                struct.value  += ":" + tokens[2]
-                struct.offset += int(tokens[2])
-
-            if tokens[0] == "-": struct.offset = -struct.offset
-
-        return struct
-
-#-----------------------------------------------------------------------
-TIME_ZONE.setParseAction(PdsTimeZone.parse)
-################################################################################
-# PdsZonedTime
-################################################################################
-ZONED_TIME      = HMS_TIME + TIME_ZONE
-ZONED_TIME.setWhitespaceChars("")
-ZONED_TIME.setName("ZONED_TIME")
-#-----------------------------------------------------------------------
-
-class PdsZonedTime(PdsTime):
-    """A time of day, including a time zone."""
-
-    def __init__(self):
-        PdsValue.__init__(self, "", ZONED_TIME)
-        self.elapsed = 0.               # seconds elapsed since midnight GMT
-        self.pdshms  = None             # PdsHmsTime object
-        self.pdszone = None             # PdsTimeZone object
-
-    def __str__(self):
-        return str(self.pdshms) + str(self.pdszone)
-
-    # Interpret parser tokens
-    @staticmethod
-    def parse(s, l, tokens):
-
-        struct = PdsZonedTime()
-        struct.pdshms  = tokens[0]
-        struct.pdszone = tokens[1]
-
-        struct.elapsed = struct.pdshms.elapsed - 60 * struct.pdszone.offset
-        struct.value = str(struct)
-
-        return struct
-
-#-----------------------------------------------------------------------
-ZONED_TIME.setParseAction(PdsZonedTime.parse)
-#-----------------------------------------------------------------------
-TIME_WO_WHITE   = ZONED_TIME | HMS_TIME                 # Order matters here!
-TIME            = Suppress(Optional(WHITE)) + TIME_WO_WHITE
-TIME.setName("TIME")
-################################################################################
-# PdsDate
-################################################################################
-DATE            = (Suppress(Optional(WHITE))
-                +  UNSIGNED_INT
-                +  Suppress("-")
-                +  UNSIGNED_INT
-                +  Optional(Suppress("-")
-                          + UNSIGNED_INT))
-DATE.setWhitespaceChars("")
-DATE.setName("DATE")
-#-----------------------------------------------------------------------
-
-class PdsDate(PdsScalar):
-    """A date as year, month and day or year and day-of-year."""
-
-    def __init__(self):
-        PdsValue.__init__(self, "", DATE)
-        self.elapsed = 0        # days since January 1, 2000
-        self.year  = 0          # year
-        self.month = 0          # month number (0 for day-of-year format)
-        self.day   = 0          # day of month
-        self.date  = None       # date object from datetime module
-
-    def __str__(self):
-        if self.month:
-            return ("%d"%self.year + "-" + "%02d"%self.month
-                                   + "-" + "%02d"%self.day)
-        else:
-            return ("%d"%self.year + "-" + "%03d"%self.day)
-
-    # Interpret parser tokens
-    @staticmethod
-    def parse(s, l, tokens):
-
-        if len(tokens) == 2:
-            struct = PdsDate.from_yd(int(tokens[0]), int(tokens[1]))
-        else:
-            struct = PdsDate.from_ymd(int(tokens[0]), int(tokens[1]),
-                                                      int(tokens[2]))
-
-        return struct
-
-    @staticmethod
-    def from_ymd(year, month, day):
-        """Returns a new PdsDate given a year, month and day."""
-
-        struct = PdsDate()
-
-        struct.year = year
-        struct.month = month
-        struct.day = day
-
-        struct.date = dt.date(year, month, day)
-        struct.elapsed = (struct.date - dt.date(2000,1,1)).days
-        struct.value = str(struct)
-
-        return struct
-
-    @staticmethod
-    def from_yd(year, day):
-        """Returns a new PdsDate given a year and day of year."""
-
-        struct = PdsDate()
-
-        struct.year = year
-        struct.month = 0
-        struct.day = day
-
-        struct.date = dt.date(struct.year, 1, 1) + dt.timedelta(struct.day - 1)
-        struct.elapsed = (struct.date - dt.date(2000,1,1)).days
-        struct.value = str(struct)
-
-        return struct
-
-#-----------------------------------------------------------------------
-DATE.setParseAction(PdsDate.parse)
-################################################################################
-# PdsDateTime
-################################################################################
-DATE_TIME       = (Suppress(Optional(WHITE))
-                +  DATE
-                +  Suppress(oneOf("T t"))
-                +  TIME_WO_WHITE)
-DATE_TIME.setWhitespaceChars("")
-DATE_TIME.setName("DATE_TIME")
-#-----------------------------------------------------------------------
-
-class PdsDateTime(PdsScalar):
-
-    def __init__(self):
-        PdsValue.__init__(self, "", DATE_TIME)
-        self.elapsed = 0.               # seconds since January 1, 2000, without
-                                        # leapseconds
-        self.pdsdate = None             # PdsDate object
-        self.pdstime = None             # PdsTime object
-
-    def __str__(self):
-        return str(self.pdsdate) + "T" + str(self.pdstime)
-
-    # Interpret parser tokens
-    @staticmethod
-    def parse(s, l, tokens):
-
-        struct = PdsDateTime.from_dt(tokens[0], tokens[1])
-        return struct
-
-    @staticmethod
-    def from_dt(pdsdate, pdstime):
-        """Constructs a new PdsDateTime from PdsDate and PdsTime objects."""
-
-        struct = PdsDateTime()
-
-        struct.pdsdate = pdsdate
-        struct.pdstime = pdstime
-
-        struct.elapsed = pdsdate.elapsed * 86400 + pdstime.elapsed
-        struct.value = str(struct)
-
-        return struct
-
-#-----------------------------------------------------------------------
-DATE_TIME.setParseAction(PdsDateTime.parse)
-################################################################################
-# PdsText: value is the contents of the text string, quoted or not.
-################################################################################
-EMPTY_TEXT      = Combine('""')
-WHITE_TEXT      = Suppress('"') + White() + Literal('"')
-NONEMPTY_TEXT   = Suppress('"') + Combine(CharsNotIn('"')) + Literal('"')
-QUOTED_SYMBOL   = Suppress("'") + Combine(CharsNotIn("'\n")) + Literal("'")
-UNQUOTED_TEXT   = Combine(IDENTIFIER)
-TEXT_VALUE      = (EMPTY_TEXT | WHITE_TEXT | NONEMPTY_TEXT | QUOTED_SYMBOL |
-                   UNQUOTED_TEXT)
-TEXT_VALUE.setName("TEXT_VALUE")
-#-----------------------------------------------------------------------
-
-class PdsText(PdsScalar):
-    """A text string in single quotes, double quotes, or no quotes."""
-
-    def __init__(self):
-        PdsValue.__init__(self, "", TEXT_VALUE)
-        self.quote = None       # Quote character surrounding the text, if any
-
-    def __str__(self):
-        return self.value
-
-    def __repr__(self):
-        return self.quote + self.value + self.quote
-
-    # Interpret parser tokens
-    @staticmethod
-    def parse(s, l, tokens):
-
-        struct = PdsText()
-
-        if len(tokens) == 1:
-            if tokens[0] == '""':
-                struct.value = ""
-                struct.quote = '"'
-            else:
-                struct.value = tokens[0]
-                struct.quote = ""
-
-        else:
-            struct.value = tokens[0]
-            struct.quote = tokens[1]
-
-        return struct
-
-    @staticmethod
-    def from_string(string, quote):
-        """Return a new PdsText object containing the given string, which has
-        been checked for suitability."""
-
-        struct = PdsText()
-
-        struct.value = string
-        struct.quote = quote
-
-        if quote not in " '\"": raise ValueError("illegal quote character")
-
-        if quote != "" and quote in string:
-            raise ValueError("text contains its own quote character")
-
-        if quote == "" and " " in string:
-            raise ValueError("unquoted text may not contain blanks")
-
-        if quote != '"' and "\n" in string:
-            raise ValueError("newline may not appear except in double-quotes")
-
-        if quote != '"' and len(string) > 70:
-            raise ValueError("long lines must be enclosed in double-quotes")
-
-        # Strip \r from multi-line strings
-        struct.value = "\n".join([s.strip("\r")
-                               for s in struct.value.splitlines()])
-
-        return struct
-
-#-----------------------------------------------------------------------
-TEXT_VALUE.setParseAction(PdsText.parse)
-#-----------------------------------------------------------------------
-PDS_SCALAR      = DATE_TIME | DATE | TIME | NUMBER | TEXT_VALUE # Order counts!
-################################################################################
-# PdsVector: value is a pointer to a 1-D or 2-D list structure.
-################################################################################
-
-class PdsVector(PdsValue):
-
-    def __init__(self):
-        PdsValue.__init__(self, [], VECTOR_VALUE)
-        self.delim = ""         # "{}" for sets, "()" for 1-D arrays, "(())" for
-                                # 2-D arrays.
-
-    def __str__(self):
-        list = [self.delim[0]]
-        for v in self.value:
-            list += [str(v), ", "]
-        list[-1] = self.delim[-1]    # Replace final comma with a delimiter
-        return "".join(list)
-
-    def __repr__(self):
-        list = [self.delim[0]]
-        for v in self.value:
-            list += [repr(v), ", "]
-        list[-1] = self.delim[-1]    # Replace final comma with a delimiter
-        return "".join(list)
-
-    def __getitem__(self, key): return self.value[key]
-
-    def __len__(self): return len(self.value)
-
-    def as_python_value(self):
-        """Overrides the default PdsNode method to ensure that the elements of
-        the vector also get translated to standard Python types.
-        """
-
-        list = []
-        for item in self.value:
-            list.append(item.as_python_value())
-
-        return list
-
-################################################################################
-# PdsSet
-################################################################################
-LBRACE          = Suppress(Literal("{"))
-RBRACE          = Suppress(Literal("}"))
-EMPTY_SET       = (Suppress(LBRACE) + ZeroOrMore(EOL) + Suppress(RBRACE))
-
-NONEMPTY_SET    = (LBRACE                   + ZeroOrMore(EOL)
-                +  PDS_SCALAR               + ZeroOrMore(EOL)
-                +  ZeroOrMore(Suppress(Literal(","))
-                                            + ZeroOrMore(EOL)
-                                            + PDS_SCALAR
-                                            + ZeroOrMore(EOL))
-                +  RBRACE)
-SET_VALUE       = EMPTY_SET | NONEMPTY_SET
-SET_VALUE.setName("SET_VALUE")
-#-----------------------------------------------------------------------
-
-class PdsSet(PdsVector):
-    """A set of scalar values in curly braces {}."""
-
-    def __init__(self):
-        PdsValue.__init__(self, [], SET_VALUE)
-        self.delim = "{}"
-
-    # Interpret parser tokens
-    @staticmethod
-    def parse(s, l, tokens):
-        struct = PdsSet()
-        struct.value = list(tokens)
-        return struct
-
-#-----------------------------------------------------------------------
-SET_VALUE.setParseAction(PdsSet.parse)
-################################################################################
-# PdsSequence
-################################################################################
-LPAREN          = Suppress(Literal("("))
-RPAREN          = Suppress(Literal(")"))
-SEQUENCE        = (LPAREN                   + ZeroOrMore(EOL)
-                +  PDS_SCALAR               + ZeroOrMore(EOL)
-                +  ZeroOrMore(Suppress(Literal(","))
-                                            + ZeroOrMore(EOL)
-                                            + PDS_SCALAR
-                                            + ZeroOrMore(EOL))
-                +  RPAREN)
-SEQUENCE.setName("SEQUENCE")
-#-----------------------------------------------------------------------
-
-class PdsSequence(PdsVector):
-    """A 1-D set of scalar values in parentheses."""
-
-    def __init__(self):
-        PdsValue.__init__(self, [], SEQUENCE)
-        self.delim = "()"
-
-    # Interpret parser tokens
-    @staticmethod
-    def parse(s, l, tokens):
-        struct = PdsSequence()
-        struct.value = list(tokens)
-        return struct
-
-#-----------------------------------------------------------------------
-SEQUENCE.setParseAction(PdsSequence.parse)
-################################################################################
-# PdsSequence2D
-################################################################################
-SEQUENCE_2D     = (LPAREN                   + ZeroOrMore(EOL)
-                +  SEQUENCE                 + ZeroOrMore(EOL)
-                +  ZeroOrMore(Suppress(Literal(","))
-                                            + ZeroOrMore(EOL)
-                                            + SEQUENCE
-                                            + ZeroOrMore(EOL))
-                +  RPAREN)
-SEQUENCE_2D.setName("SEQUENCE_2D")
-#-----------------------------------------------------------------------
-
-class PdsSequence2D(PdsVector):
-    """A 2-D set of scalar values in nested parentheses."""
-
-    def __init__(self):
-        PdsValue.__init__(self, [], SEQUENCE_2D)
-        self.delim = "(())"
-
-    # Interpret parser tokens
-    @staticmethod
-    def parse(s, l, tokens):
-        struct = PdsSequence2D()
-        struct.value = list(tokens)
-        return struct
-
-#-----------------------------------------------------------------------
-SEQUENCE_2D.setParseAction(PdsSequence2D.parse)
-#-----------------------------------------------------------------------
-VECTOR_VALUE    = SET_VALUE | SEQUENCE | SEQUENCE_2D
-#-----------------------------------------------------------------------
-PDS_VALUE       = VECTOR_VALUE | PDS_SCALAR     # Order counts, no pointers!
-################################################################################
-################################################################################
-# PdsPointer
-################################################################################
-################################################################################
-
-class PdsPointer(PdsValue):
-    """The general class describing simple pointers and pointers with
-    offsets."""
-
-################################################################################
-# PdsSimplePointer
-################################################################################
-FILENAME        = Combine(Word(alphanums + "_")
-                        + OneOrMore("." + Word(alphanums + "_")))
-FILENAME.setName("FILENAME")
-
-SIMPLE_POINTER  = (Suppress(Optional(WHITE))
-                +  Suppress('"')
-                +  FILENAME
-                +  Suppress('"'))
-SIMPLE_POINTER.setWhitespaceChars("")
-SIMPLE_POINTER.setName("SIMPLE_POINTER")
-#-----------------------------------------------------------------------
-
-class PdsSimplePointer(PdsPointer):
-
-    def __init__(self):
-        PdsValue.__init__(self, "", SIMPLE_POINTER)
-
-    def __str__(self): return '"' + self.value + '"'
-
-    @staticmethod
-    def parse(s, l, tokens):
-        struct = PdsSimplePointer()
-        struct.value = tokens[0]
-        return struct
-
-#-----------------------------------------------------------------------
-SIMPLE_POINTER.setParseAction(PdsSimplePointer.parse)
-################################################################################
-# PdsLocalPointer
-################################################################################
-BYTE_UNIT       = Literal("<BYTES>") | Literal("<bytes>")
-ROW_OFFSET      = Combine(UNSIGNED_INT)
-BYTE_OFFSET     = ROW_OFFSET + ZeroOrMore(EOL) + BYTE_UNIT
-
-LOCAL_POINTER   = BYTE_OFFSET | ROW_OFFSET
-LOCAL_POINTER.setName("LOCAL_POINTER")
-#-----------------------------------------------------------------------
-
-class PdsLocalPointer(PdsPointer):
-
-    def __init__(self):
-        PdsValue.__init__(self, "", LOCAL_POINTER)
-        self.filename = ""              # file name
-        self.value = 0                  # numeric offset in rows or bytes
-        self.unit = "RECORDS"           # Unit of offset
-
-    def __str__(self):
-        if self.unit == "RECORDS":
-            return str(self.value)
-        else:
-            return str(self.value) + " <BYTES>"
-
-    @staticmethod
-    def parse(s, l, tokens):
-        struct = PdsLocalPointer()
-        struct.value = int(tokens[0])
-        if len(tokens) > 1: struct.unit = "BYTES"
-
-        return struct
-
-    def as_python_value(self):
-        """Overrides the default PdsNode method to return the offset and units
-        as a tuple.
-        """
-
-        return (self.value, self.unit)
-
-#-----------------------------------------------------------------------
-LOCAL_POINTER.setParseAction(PdsLocalPointer.parse)
-################################################################################
-# PdsOffsetPointer
-################################################################################
-OFFSET_POINTER  = (LPAREN                       + ZeroOrMore(EOL)
-                +  SIMPLE_POINTER               + ZeroOrMore(EOL)
-                +  Suppress(",")                + ZeroOrMore(EOL)
-                +  LOCAL_POINTER                + ZeroOrMore(EOL)
-                +  RPAREN)
-OFFSET_POINTER.setName("OFFSET_POINTER")
-#-----------------------------------------------------------------------
-
-class PdsOffsetPointer(PdsPointer):
-
-    def __init__(self):
-        PdsValue.__init__(self, "", OFFSET_POINTER)
-        self.value = ""                 # file name
-        self.offset = 0                 # numeric offset in rows or bytes
-        self.unit = "RECORDS"           # Unit of offset
-
-    def __str__(self):
-        if self.unit == "RECORDS":
-            return "(" + self.value + ", " + str(self.offset) + ")"
-        else:
-            return "(" + self.value + ", " + str(self.offset) + " <BYTES>)"
-
-    @staticmethod
-    def parse(s, l, tokens):
-        struct = PdsOffsetPointer()
-        struct.value  = tokens[0].value
-        struct.offset = tokens[1].value
-        struct.unit   = tokens[1].unit
-
-        return struct
-
-    def as_python_value(self):
-        """Overrides the default PdsNode method to return the file name,
-        offset and units as a tuple.
-        """
-
-        return (self.value, self.offset, self.unit)
-
-#-----------------------------------------------------------------------
-OFFSET_POINTER.setParseAction(PdsOffsetPointer.parse)
-################################################################################
-# PdsVectorPointer
-################################################################################
-
-class PdsVectorPointer(PdsPointer):
-    """A superclass of PdsSetPointer and PdsSequencePointer."""
-
-    def __str__(self):
-        list = [self.delim[0]]
-        for v in self.value:
-            list += [str(v), ", "]
-        list[-1] = self.delim[-1]    # Replace final comma with a delimiter
-        return "".join(list)
-
-    def __repr__(self):
-        list = [self.delim[0]]
-        for v in self.value:
-            list += [repr(v), ", "]
-        list[-1] = self.delim[-1]    # Replace final comma with a delimiter
-        return "".join(list)
-
-    def __getitem__(self, key): return self.value[key]
-
-    def __len__(self): return len(self.value)
-
-    def as_python_value(self):
-        """Overrides the default PdsNode method to ensure that the elements of
-        the vector also get translated to standard Python types.
-        """
-
-        list = []
-        for item in self.value:
-            list.append(item.as_python_value())
-
-        return list
-
-################################################################################
-# PdsSetPointer
-################################################################################
-LBRACE          = Suppress(Literal("{"))
-RBRACE          = Suppress(Literal("}"))
-SET_POINTER     = (LBRACE                   + ZeroOrMore(EOL)
-                +  SIMPLE_POINTER           + ZeroOrMore(EOL)
-                +  ZeroOrMore(Suppress(Literal(","))
-                                            + ZeroOrMore(EOL)
-                                            + SIMPLE_POINTER
-                                            + ZeroOrMore(EOL))
-                +  RBRACE)
-SET_POINTER.setName("SET_POINTER")
-#-----------------------------------------------------------------------
-
-class PdsSetPointer(PdsVectorPointer):
-    """A set of simple pointers in curly braces {}."""
-
-    def __init__(self):
-        PdsValue.__init__(self, [], SET_POINTER)
-        self.delim = "{}"
-
-    # Interpret parser tokens
-    @staticmethod
-    def parse(s, l, tokens):
-        struct = PdsSetPointer()
-        struct.value = list(tokens)
-        return struct
-
-#-----------------------------------------------------------------------
-SET_POINTER.setParseAction(PdsSetPointer.parse)
-#-----------------------------------------------------------------------
-################################################################################
-# PdsSequencePointer
-################################################################################
-LPAREN          = Suppress(Literal("("))
-RPAREN          = Suppress(Literal(")"))
-SEQUENCE_POINTER= (LPAREN                   + ZeroOrMore(EOL)
-                +  SIMPLE_POINTER           + ZeroOrMore(EOL)
-                +  ZeroOrMore(Suppress(Literal(","))
-                                            + ZeroOrMore(EOL)
-                                            + SIMPLE_POINTER
-                                            + ZeroOrMore(EOL))
-                +  RPAREN)
-SEQUENCE_POINTER.setName("SEQUENCE_POINTER")
-#-----------------------------------------------------------------------
-
-class PdsSequencePointer(PdsVectorPointer):
-    """A set of simple pointers in parentheses ()."""
-
-    def __init__(self):
-        PdsValue.__init__(self, [], SEQUENCE_POINTER)
-        self.delim = "()"
-
-    # Interpret parser tokens
-    @staticmethod
-    def parse(s, l, tokens):
-        struct = PdsSequencePointer()
-        struct.value = list(tokens)
-        return struct
-
-#-----------------------------------------------------------------------
-SEQUENCE_POINTER.setParseAction(PdsSequencePointer.parse)
-#-----------------------------------------------------------------------
-POINTER_VALUE = (SIMPLE_POINTER | OFFSET_POINTER | LOCAL_POINTER | SET_POINTER
-                                | SEQUENCE_POINTER)
-POINTER_VALUE.setName("POINTER_VALUE")
-################################################################################
-################################################################################
-# PdsKeyword
-################################################################################
-################################################################################
-
-class PdsKeyword(PdsItem):
-    """The abstract class for anything on the left of an equal sign."""
-
-    def __init__(self, pointer_char=""):
-        self.name = ""                      # Name of the attribute
-        self.namespace = ""                 # Optional namespace
-        self.pointer_char = pointer_char    # Optional pointer indicator
-
-    def __str__(self):
-        if self.namespace:
-            return self.pointer_char + self.namespace + ":" + self.name
-        else:
-            return self.pointer_char + self.name
-
-################################################################################
-# PdsAttributeID
-################################################################################
-SINGLE_ATTR_ID  = Combine(IDENTIFIER)
-
-DOUBLE_ATTR_ID  = (Suppress(Optional(WHITE))
-                +  IDENTIFIER
-                +  Suppress(":")
-                +  IDENTIFIER)
-DOUBLE_ATTR_ID.setWhitespaceChars("")
-
-ATTRIBUTE_ID    = DOUBLE_ATTR_ID | SINGLE_ATTR_ID               # Order counts
-ATTRIBUTE_ID.setName("ATTRIBUTE_ID")
-#-----------------------------------------------------------------------
-
-class PdsAttributeID(PdsKeyword):
-    """This class represents a simple attribute with option namespace
-    prefix."""
-
-    def __init__(self):
-        PdsKeyword.__init__(self)
-
-    # Interpret parser tokens
-    @staticmethod
-    def parse(s, l, tokens):
-
-        struct = PdsAttributeID()
-        struct.name = tokens[-1]
-
-        if len(tokens) == 2: struct.namespace = tokens[0]
-
-        return struct
-
-#-----------------------------------------------------------------------
-ATTRIBUTE_ID.setParseAction(PdsAttributeID.parse)
-################################################################################
-# PdsPointerID
-################################################################################
-POINTER_ID      = Suppress(Optional(WHITE) + Literal("^")) + ATTRIBUTE_ID
-POINTER_ID.setWhitespaceChars("")
-POINTER_ID.setName("POINTER_ID")
-#-----------------------------------------------------------------------
-
-class PdsPointerID(PdsKeyword):
-    """This class represents a pointer."""
-
-    def __init__(self):
-        PdsKeyword.__init__(self, pointer_char="^")
-
-    # Interpret parser tokens
-    @staticmethod
-    def parse(s, l, tokens):
-        struct = PdsPointerID()
-        struct.name = tokens[0].name
-        struct.namespace = tokens[0].namespace
-        struct.value = str(struct)
-
-        return struct
-
-#-----------------------------------------------------------------------
-POINTER_ID.setParseAction(PdsPointerID.parse)
-################################################################################
-################################################################################
-# Statements
-################################################################################
-################################################################################
-POINTER_STMT    = (POINTER_ID           + ZeroOrMore(EOL)
-                + Suppress("=")         + ZeroOrMore(EOL)
-                + POINTER_VALUE         + OneOrMore(EOL))
-
-ATTRIBUTE_STMT  = (ATTRIBUTE_ID         + ZeroOrMore(EOL)
-                + Suppress("=")         + ZeroOrMore(EOL)
-                + PDS_VALUE             + OneOrMore(EOL))
-
-STATEMENT       = (POINTER_STMT | ATTRIBUTE_STMT)
-STATEMENT.setName("STATEMENT")
-STATEMENT.setParseAction(PdsNode.parse)
-
-END_STATEMENT   = Suppress(Literal("END") + ZeroOrMore(NEWLINE))
-END_STATEMENT.setParseAction(PdsNode.parse_end)
-#-----------------------------------------------------------------------
-PDS_LABEL       = ZeroOrMore(EOL) + OneOrMore(STATEMENT) + END_STATEMENT
-################################################################################
-# PdsLabel
-################################################################################
-
-class PdsLabel():
-    """This class represents the entire contents of a PDS label."""
-
-    def __init__(self):
-        self.filename = ""      # The source of the label
-        self.string = ""        # The complete contents of the label as read
-        self.root = None        # The root node of the parse tree
-
-    def __str__(self): return self.root.__str__()
-
-    def __repr__(self): return str(self)
-
-    def __getitem__(self, key): return self.root[key]
-
-    def __len__(self): return len(self.root)
+        return len(self.dict)
 
     def __contains__(self, key):
-        return key in {n.name for n in self.root.children}
+        return key in self.dict
+
+    def get(self, key, default=None):
+        """The value for key if key is in the label; otherwise, the specified default."""
+        return self.dict.get(key, default)
+
+    def items(self):
+        """Iterator over (key, value) tuples for this dictionary."""
+        return self.dict.items()
 
     def keys(self):
-        return [n.name for n in self.root.children]
+        """Iterator over this dictionary's keys."""
+        return self.dict.keys()
 
+    def values(self):
+        """Iterator over this dictionary's values."""
+        return self.dict.values()
+
+    def _as_item_dict(self):
+        """A dictionary returning _Item objects, keyed by the label attribute name.
+
+        If the item is an OBJECT or GROUP, it returns a sub-dictionary of _Items instead.
+        For COLUMN and FIELD objects that have a NAME attribute, the key is that name
+        rather than simply "COLUMN" or "FIELD".
+
+        Duplciated keys get assigned suffixes "_2", "_3", etc.
+
+        If the value of END_OBJECT or END_GROUP is missing, it is filled in from the
+        matching OBJECT or GROUP.
+        """
+
+        dict_list = [{}]
+        key_list = ['']
+        for statement in self._statements:
+            name = statement.name
+            item = statement.item
+            dict_ = dict_list[-1]
+
+            # If this is an object or group, start a new dictionary
+            if name in ('OBJECT', 'GROUP'):
+                object_dict = {name: item}
+                dict_list.append(object_dict)
+                key_list.append(item.value)
+                continue
+
+            # Replace the key for a COLUMN or FIELD by its NAME value if found
+            if key_list[-1] in {'COLUMN', 'FIELD', 'BIT_COLUMN'} and name == 'NAME':
+                key_list[-1] = item.value
+
+            # Make the key unique and add its value to the dictionary
+            key = _unique_key(name, dict_)
+            dict_[key] = item
+            if name not in ('END_OBJECT', 'END_GROUP'):
+                continue
+
+            # Fill in a missing value for END_OBJECT or END_GROUP
+            if item is None:
+                dict_[name] = dict_[name[4:]]
+                dict_[name + '_source'] = ''    # override because there's no source
+
+            # Pop this dictionary and insert it into the higher-level dictionary
+            if not dict_list:
+                raise SyntaxError('unbalanced END_OBJECT or END_GROUP')
+            object_dict = dict_list.pop()
+            key = _unique_key(key_list.pop(), dict_list[-1])
+            dict_list[-1][key] = object_dict
+
+        if len(dict_list) != 1:
+            raise SyntaxError('missing END_OBJECT or END_GROUP')
+
+        return dict_list[0]
+
+    def _python_dict(self, types=False, sources=False, details=False):
+        """The label content as a Python dictionary.
+
+        Keys are the attribute names (with numeric suffix for duplicates).
+        """
+
+        def from_item_dict(item_dict):
+            dict_ = {}
+            for key, item in item_dict.items():
+                if key.endswith('_source'):
+                    continue
+
+                if isinstance(item, dict):
+                    dict_[key] = from_item_dict(item)   # recursive call
+                    continue
+
+                if not item:
+                    dict_[key] = item
+                    continue
+
+                dict_[key] = item.value
+                suffixes = list(item.suffixes)
+                if types:
+                    dict_[key + '_type'] = item.type_
+                if sources:
+                    dict_[key + '_source'] = item.source
+
+                for suffix in suffixes:
+                    dict_[key + '_' + suffix.rstrip('_')] = getattr(item, suffix)
+
+                if details:
+                    dict_[key + '_detail'] = item
+
+            # When there's no associated object, the "_source" key provided initem_dict
+            # contains the override source value. Used for END_OBJECT with no value.
+            for key, value in item_dict.items():
+                if key.endswith('_source'):     # there's no source object
+                    if sources:
+                        dict_[key] = value
+                    if details:
+                        del dict_[key.replace('source', 'detail')]
+
+            return dict_
+
+        item_dict = self._as_item_dict()
+        return from_item_dict(item_dict)
+
+    # Old, deprecated API
     def as_dict(self):
-        """Returns the contents of the label as a standard Python dictionary
-        containing standard Python types of int, float, string, list, etc. It
-        uses a Python dictionary recursively to represent the contents of an
-        object. Note that COLUMN objects are indexed by the NAME field that they
-        contain, whereas other objects are indexed by the value on the right
-        side of the equal sign in the label."""
+        """This label as a Python dictionary. Part of the old PdsLabel API.
 
-        return self.root.as_python_value()
+        DEPRECATED; use the `dict_` attribute or apply the dict API directoy to this
+        Pds3Label object.
+
+        Note that this function matches the previous output of as_dict(). Specifically,
+
+        * dates, times, and datetimes are returned as strings in ISO format.
+        * file_offset_pointers are returned as a tuple (filename, offset, unit).
+        * set values are returns as lists.
+        * units are omitted.
+        """
+
+        def to_old_dict(dict_):
+            old = {}
+            for key, value in dict_.items():
+                if key != key.upper():
+                    continue
+
+                if isinstance(value, dict):
+                    old[key] = to_old_dict(value)
+                elif isinstance(value, (dt.date, dt.time, dt.datetime)):
+                    old[key] = dict_[key + '_fmt']
+                elif isinstance(value, set):
+                    old[key] = dict_[key + '_list']
+                elif key + '_offset' in dict_:
+                    old[key] = (value, dict_[key + '_offset'],
+                                'BYTES' if dict_[key + '_unit'] else 'RECORDS')
+                else:
+                    old[key] = value
+            return old
+
+        return to_old_dict(self.dict)
 
     @staticmethod
     def from_file(filename):
-        """Loads and parses a PDS label."""
+        """Load and parse a PDS label. Part of the old PdsLabel API.
 
-        lines = PdsLabel.load_file(filename)
-        return PdsLabel.from_string(lines)
-
-    @staticmethod
-    def load_file(filename):
-        """Loads a PDS label, returning a list of strings, one for each line.
+        DEPRECATED; use Pds3Label(filename).
         """
 
-        # Open file for read; could be binary but if so pretend it isn't
-        file = open(filename, "r", **ENCODING)
+        return Pds3Label(filename)
 
-        # Create a list of lines
-        lines = []
-        quotes = 0              #...while counting quotes
-        for line in file:
+    @staticmethod
+    def load_file(filepath):
+        """Load a PDS label, possibly attached, returning a list of strings. Part of the
+        old PdsLabel API.
 
-            # An empty string means end of file
-            if line == "": raise SyntaxError("Missing END statement")
+        DEPRECATED; use read_label(filepath).
+        """
 
-            # Remove the line terminators from each line
-            line = line.strip("\r\n")
-            lines.append(line)
-
-            # Look for the END statement, but only outside quotes
-            if quotes%2 == 0:
-                if line == "END" or line[0:4] == "END ": break
-
-            # Update the quote count
-            quotes += line.count('"')
-
-        # Close the file
-        file.close()
-
-        return lines
+        content = read_label(filepath)
+        recs = content.split('\n')
+        return [rec + '\n' for rec in recs[:-1]]
 
     @staticmethod
     def from_string(string):
-        """Parses a string or list of strings containing the contents of a PDS
-        label."""
+        """Construct a Pds3Label from a string or list of strings. Part of the old
+        PdsLabel API.
 
-        global PARSE_NODES
+        DEPRECATED; just use Pds3Label(string).
+        """
 
-        this = PdsLabel()
-        this.filename = None
+        return Pds3Label(string)
 
-        # If this is a list, concatenate the lines into a string
-        if type(string) == type([]):
-            string = "\n".join(string) + "\n"
+# Deprecated name for the class
+PdsLabel = Pds3Label
 
-        # Initialize the object status in the parsed label
-        PdsNode.init_current_node()
-
-        # Parse the label
-        this.label = PDS_LABEL.parseString(string).asList()
-        this.root = PARSE_NODES[0]
-
-        return this
-
-    @staticmethod
-    def FromFile(filename):
-        """Deprecated alternative name for from_file()"""
-
-        return PdsLabel.from_file(filename)
-
-################################################################################
+##########################################################################################
