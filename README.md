@@ -1,7 +1,7 @@
 [![GitHub release; latest by date](https://img.shields.io/github/v/release/SETI/rms-pdsparser)](https://github.com/SETI/rms-pdsparser/releases)
 [![GitHub Release Date](https://img.shields.io/github/release-date/SETI/rms-pdsparser)](https://github.com/SETI/rms-pdsparser/releases)
 [![Test Status](https://img.shields.io/github/actions/workflow/status/SETI/rms-pdsparser/run-tests.yml?branch=main)](https://github.com/SETI/rms-pdsparser/actions)
-[![Documentation Status](https://readthedocs.org/projects/rms-starcat/badge/?version=latest)](https://rms-starcat.readthedocs.io/en/latest/?badge=latest)
+[![Documentation Status](https://readthedocs.org/projects/rms-pdsparser/badge/?version=latest)](https://rms-pdsparser.readthedocs.io/en/latest/?badge=latest)
 [![Code coverage](https://img.shields.io/codecov/c/github/SETI/rms-pdsparser/main?logo=codecov)](https://codecov.io/gh/SETI/rms-pdsparser)
 <br />
 [![PyPI - Version](https://img.shields.io/pypi/v/rms-pdsparser)](https://pypi.org/project/rms-pdsparser)
@@ -258,3 +258,19 @@ The `pdsparser` module provides several additional utilities for handling PDS3 l
 - `expand_structures`[![image](https://raw.githubusercontent.com/SETI/rms-pdsparser/main/icons/link.png)](https://rms-pdaparser.readthedocs.io/en/latest/module.html#_utils.expand_structures):
   Replaces any `^STRUCTURE` keywords in a label string
   with the content of the associated ".FMT" files.
+
+# Contributing
+
+Information on contributing to this package can be found in the
+[Contributing Guide](https://github.com/SETI/rms-pdsparser/blob/main/CONTRIBUTING.md).
+
+# Links
+
+- [Documentation](https://rms-pdsparser.readthedocs.io)
+- [Repository](https://github.com/SETI/rms-pdsparser)
+- [Issue tracker](https://github.com/SETI/rms-pdsparser/issues)
+- [PyPi](https://pypi.org/project/rms-pdsparser)
+
+# Licensing
+
+This code is licensed under the [Apache License v2.0](https://github.com/SETI/rms-pdsparser/blob/main/LICENSE).
