@@ -90,11 +90,6 @@ def read_vax_binary_label(filepath):
 
     Raises:
         FileNotFoundError: If the label file is missing.
-
-    Notes:
-        If the filepath ends in ".lbl" or ".LBL", it is assumed to refer to a detached
-        label and the entire file content is returned. Otherwise, it reads the file
-        (which may be binary) until it finds an "END" statement.
     """
 
     filepath = FCPath(filepath)

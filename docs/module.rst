@@ -9,7 +9,7 @@
     :show-inheritance:
     :exclude-members: __dict__, __hash__, __module__, __weakref__
 
-.. automodule:: pdsparser._utils
+.. automodule:: pdsparser.utils
     :member-order: bysource
     :members:
     :special-members:
