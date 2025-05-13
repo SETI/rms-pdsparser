@@ -11,7 +11,7 @@ import re
 from pathlib import Path
 from filecache import FCPath
 
-from ._utils import _based_int, _is_identifier, _format_float, _unique_key, _unwrap
+from .utils import _based_int, _is_identifier, _format_float, _unique_key, _unwrap
 
 _UNITS = re.compile(r' *(<.*?>)')
 _BASED_INT = re.compile(r'(\d+)#(\w+)#')

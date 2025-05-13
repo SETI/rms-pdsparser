@@ -5,7 +5,7 @@
 import unittest
 
 # Note: most functions in _utils.py are tested fully by test_labels.py.
-from pdsparser._utils import _unwrap
+from pdsparser.utils import _unwrap
 
 
 class Test_utils(unittest.TestCase):

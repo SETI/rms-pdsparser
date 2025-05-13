@@ -237,7 +237,7 @@ try:
 except ImportError:
     __version__ = 'Version unspecified'
 
-from ._utils import read_label, read_vax_binary_label, expand_structures, _unique_key
+from .utils import read_label, read_vax_binary_label, expand_structures, _unique_key
 from ._fast_dict import _fast_dict
 from ._PDS3_GRAMMAR import _PDS3_LABEL, _ALT_PDS3_LABEL, _Value
 
