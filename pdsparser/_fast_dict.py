@@ -5,11 +5,7 @@
 import datetime as dt
 import julian
 import numbers
-import os
-import pdsparser
 import re
-from pathlib import Path
-from filecache import FCPath
 
 from .utils import _based_int, _is_identifier, _format_float, _unique_key, _unwrap
 
@@ -130,7 +126,7 @@ def _evaluate(value, recno, name):
         info['source'] = match.group(1)
         return (value, info)
 
-    if match:= _TIME.fullmatch(source):
+    if match := _TIME.fullmatch(source):
         sec = julian.sec_from_iso(match.group(1).rstrip('Z'))
         info['sec'] = sec
         hour, minute, second = julian.hms_from_sec(sec)
@@ -260,9 +256,7 @@ def _evaluate(value, recno, name):
     # Python-compliant.
     try:
         value = eval(value)
-        failed = False
     except Exception:   # if it can't be evaluated, it may be an identifier
-        failed = True
         info['quote'] = ''
         info['type'] = 'identifier'
 
@@ -419,7 +413,7 @@ def _fast_dict(content, types=False, sources=False):
             label.
     """
 
-    #### Active code starts here
+    # Active code starts here
 
     lines = content.split('\n')
     cleaned = _clean_lines(lines)

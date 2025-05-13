@@ -213,7 +213,7 @@ def _unique_key(name, dict_):
         return name
 
     indx = 2
-    while (key := name +  '_' + str(indx)) in dict_:
+    while (key := name + '_' + str(indx)) in dict_:
         indx += 1
 
     return key

@@ -6,11 +6,7 @@ import datetime as dt
 import unittest
 from pyparsing import ParseException, StringEnd
 
-from pdsparser._PDS3_GRAMMAR import (_Item,
-                                     _Value,
-                                     _Scalar,
-                                     _Number,
-                                     _Integer,
+from pdsparser._PDS3_GRAMMAR import (_Integer,
                                      _BasedInteger,
                                      _Real,
                                      _NumberWithUnit,
@@ -22,11 +18,9 @@ from pdsparser._PDS3_GRAMMAR import (_Item,
                                      _Date,
                                      _DateTime,
                                      _Text,
-                                     _Vector,
                                      _Set,
                                      _Sequence,
                                      _Sequence2D,
-                                     _Pointer,
                                      _SimplePointer,
                                      _LocalPointer,
                                      _OffsetPointer,
@@ -49,7 +43,7 @@ def _pass(testcase, type_, string, value, strval=None, vtype=None, test=3, super
             break
 
         grammars = [cls.grammar] if (test & 1) else []
-        if (test & 2) and  'alt_grammar' in cls.__dict__.keys():
+        if (test & 2) and 'alt_grammar' in cls.__dict__.keys():
             grammars.append(cls.alt_grammar)
 
         if not grammars:
@@ -59,7 +53,7 @@ def _pass(testcase, type_, string, value, strval=None, vtype=None, test=3, super
         for grammar in grammars:
             try:
                 obj = (grammar + StringEnd()).parse_string(string)[0]
-            except ParseException as err:
+            except ParseException:
                 print('ParseException on', str(grammar), repr(string))
                 raise
 
@@ -92,7 +86,7 @@ def _fail(testcase, type_, string, test=3, super_=True):
             break
 
         grammars = [cls.grammar] if (test & 1) else []
-        if (test & 2) and  'alt_grammar' in cls.__dict__.keys():
+        if (test & 2) and 'alt_grammar' in cls.__dict__.keys():
             grammars.append(cls.alt_grammar)
 
         if not grammars:
@@ -543,7 +537,7 @@ class Test_Sequence(unittest.TestCase):
         self.assertEqual(obj.type_, 'sequence_1D')
         self.assertEqual(str(obj), '(1, 2, 3)')
         self.assertEqual(repr(obj), '_Sequence(1, 2, 3)')
-        self.assertEqual(obj, [1,2,3])
+        self.assertEqual(obj, [1, 2, 3])
 
         _pass(self, _Sequence, '(1, 2\n,3)', [1, 2, 3], '(1, 2, 3)')
         _pass(self, _Sequence, '(1, 2.0, "three")', [1, 2.0, "three"], '(1, 2., "three")')
@@ -750,8 +744,8 @@ class Test_Statement(unittest.TestCase):
 
         _pass(self, _Statement, 'OBJECT\t   = COLUMN\n', ('OBJECT', 'COLUMN'),
               'OBJECT = COLUMN')
-        _pass(self, _Statement, 'OBJECT\t   = COLUMN\n   \n\t\r\t\n', ('OBJECT', 'COLUMN'),
-              'OBJECT = COLUMN')
+        _pass(self, _Statement, 'OBJECT\t   = COLUMN\n   \n\t\r\t\n',
+              ('OBJECT', 'COLUMN'), 'OBJECT = COLUMN')
         _pass(self, _Statement, '^CASSINI:INDEX  = ("index.tab", 800 <bytes>)\n',
               ('^CASSINI:INDEX', ("index.tab", 800, '<BYTES>')),
               '^CASSINI:INDEX = ("index.tab", 800 <BYTES>)')

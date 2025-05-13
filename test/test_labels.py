@@ -4,7 +4,6 @@
 
 import datetime
 import pathlib
-import re
 import sys
 import unittest
 
@@ -197,7 +196,7 @@ class Test_labels(unittest.TestCase):
         test = Pds3Label.from_string(d1.content)
         self.assertEqual(test.dict, d1.dict)
 
-        content = Pds3Label.load_file(FCPath(filepath))
+        _ = Pds3Label.load_file(FCPath(filepath))
         test = Pds3Label.from_string(d1.content)
         self.assertEqual(test.dict, d1.dict)
 
@@ -241,7 +240,6 @@ class Test_labels(unittest.TestCase):
         d2 = Pds3Label(filepath, method='fast', types=True, sources=True, expand=True,
                        vax=True)
         self.assertEqual(d2.dict, eval(answer))
-
 
     def test_more(self):
 

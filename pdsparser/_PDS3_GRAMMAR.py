@@ -5,7 +5,7 @@
 
 import datetime as dt
 from pyparsing import (alphanums, alphas, CharsNotIn, Combine, hexnums, Literal, nums,
-                       one_of, OneOrMore, Optional, ParseException, ParserElement,
+                       one_of, OneOrMore, Optional, ParserElement,
                        StringEnd, Suppress, Word, ZeroOrMore)
 
 try:
@@ -644,7 +644,6 @@ class _Set(_Vector):
         self.unique = unique        # list of unique items in original order
 
         # Re-handle the units
-        unique_units = set(self.all_units)
         if isinstance(self.unit, (str, type(None))):
             self.value = {item.value for item in self.unique}
         else:

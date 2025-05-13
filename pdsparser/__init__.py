@@ -239,7 +239,7 @@ except ImportError:
 
 from .utils import read_label, read_vax_binary_label, expand_structures, _unique_key
 from ._fast_dict import _fast_dict
-from ._PDS3_GRAMMAR import _PDS3_LABEL, _ALT_PDS3_LABEL, _Value
+from ._PDS3_GRAMMAR import _PDS3_LABEL, _ALT_PDS3_LABEL
 
 ##########################################################################################
 # Pds3Label
@@ -412,7 +412,7 @@ class Pds3Label():
         # Parse label
         if method == 'fast':
             self.dict, self._statements = _fast_dict(self.content, types=types,
-                                                      sources=sources)
+                                                     sources=sources)
         else:
             try:
                 if method == 'strict':
