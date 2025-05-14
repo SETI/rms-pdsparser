@@ -10,9 +10,9 @@ per-file-ignores =
     # E128 Continuation line under-indented for visual indent
     # E221 Multiple spaces before operator
     # E731 do not assign a lambda expression, use a def
-    test/test_utils.py: E128, E221
-    test/test_PDS3_GRAMMAR.py: E127, E128, E731
-    test/test_labels.py: E128
+    tests/test_utils.py: E128, E221
+    tests/test_PDS3_GRAMMAR.py: E127, E128, E731
+    tests/test_labels.py: E128
     # E741 Do not use variables named 'I', 'O', or 'l'
 # E111 Indentation is not a multiple of four
 # E114 Indentation is not a multiple of four (comment)
