@@ -1,3 +1,9 @@
 coverage
-pyparsing
+flake8
+myst-parser
 pytest
+rms-filecache
+rms-julian
+sphinx
+sphinxcontrib-napoleon
+sphinx-rtd-theme
