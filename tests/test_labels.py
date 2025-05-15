@@ -182,15 +182,15 @@ class Test_labels(unittest.TestCase):
         for test in (str(d1), repr(d1), str(d2), repr(d2)):
             lines = test.split('\n')
             self.assertEqual(lines[:9],
-                ['PDS_VERSION_ID = PDS3',
-                 'RECORD_TYPE = FIXED_LENGTH',
-                 'RECORD_BYTES = 2000',
-                 'FILE_RECORDS = 1001',
-                 '^VICAR_HEADER = ("C3450702_GEOMED.IMG", 1)',
-                 '^IMAGE = ("C3450702_GEOMED.IMG", 2)',
-                 'DATA_SET_ID = "VG1/VG2-S-ISS-2/3/4/6-PROCESSED-V1.1"',
-                 'PRODUCT_ID = "C3450702_GEOMED.IMG"',
-                 'PRODUCT_CREATION_TIME = 2012-05-01T16:00:00'])
+                             ['PDS_VERSION_ID = PDS3',
+                              'RECORD_TYPE = FIXED_LENGTH',
+                              'RECORD_BYTES = 2000',
+                              'FILE_RECORDS = 1001',
+                              '^VICAR_HEADER = ("C3450702_GEOMED.IMG", 1)',
+                              '^IMAGE = ("C3450702_GEOMED.IMG", 2)',
+                              'DATA_SET_ID = "VG1/VG2-S-ISS-2/3/4/6-PROCESSED-V1.1"',
+                              'PRODUCT_ID = "C3450702_GEOMED.IMG"',
+                              'PRODUCT_CREATION_TIME = 2012-05-01T16:00:00'])
 
         test = Pds3Label.from_file(str(filepath))
         self.assertEqual(test.dict, d1.dict)
