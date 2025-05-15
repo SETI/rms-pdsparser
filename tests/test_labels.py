@@ -151,7 +151,7 @@ class Test_labels(unittest.TestCase):
         d2 = Pds3Label(filepath, method='fast')
         self.assertEqual(d2.dict, eval(answer))
 
-        self.assertEqual(len(d1), 58)
+        self.assertEqual(len(d1), 61)
         pairs = [('PDS_VERSION_ID', 'PDS3'),
                  ('RECORD_TYPE', 'FIXED_LENGTH'),
                  ('RECORD_BYTES', 2000),
@@ -159,18 +159,20 @@ class Test_labels(unittest.TestCase):
                  ('^VICAR_HEADER', 'C3450702_GEOMED.IMG'),
                  ('^VICAR_HEADER_offset', 1),
                  ('^VICAR_HEADER_unit', ''),
+                 ('^VICAR_HEADER_fmt', '("C3450702_GEOMED.IMG", 1)'),
                  ('^IMAGE', 'C3450702_GEOMED.IMG'),
                  ('^IMAGE_offset', 2),
                  ('^IMAGE_unit', ''),
+                 ('^IMAGE_fmt', '("C3450702_GEOMED.IMG", 2)'),
                  ('DATA_SET_ID', 'VG1/VG2-S-ISS-2/3/4/6-PROCESSED-V1.1'),
                  ('PRODUCT_ID', 'C3450702_GEOMED.IMG'),
                  ('PRODUCT_CREATION_TIME', datetime.datetime(2012, 5, 1, 16, 0)),
                  ('PRODUCT_CREATION_TIME_day', 4504),
                  ('PRODUCT_CREATION_TIME_sec', 57600),
                  ('PRODUCT_CREATION_TIME_fmt', '2012-05-01T16:00:00')]
-        self.assertEqual(list(d1.items())[:16], pairs)
-        self.assertEqual(list(d1.keys())[:16], [p[0] for p in pairs])
-        self.assertEqual(list(d1.values())[:16], [p[1] for p in pairs])
+        self.assertEqual(list(d1.items())[:18], pairs)
+        self.assertEqual(list(d1.keys())[:18], [p[0] for p in pairs])
+        self.assertEqual(list(d1.values())[:18], [p[1] for p in pairs])
         self.assertEqual(d1['PDS_VERSION_ID'], 'PDS3')
         self.assertEqual(d1.get('PDS_VERSION_ID', 'whatever'), 'PDS3')
         self.assertEqual(d1.get('PDS_VERSION_IDx', 'whatever'), 'whatever')
@@ -180,15 +182,15 @@ class Test_labels(unittest.TestCase):
         for test in (str(d1), repr(d1), str(d2), repr(d2)):
             lines = test.split('\n')
             self.assertEqual(lines[:9],
-                ['PDS_VERSION_ID = PDS3',
-                 'RECORD_TYPE = FIXED_LENGTH',
-                 'RECORD_BYTES = 2000',
-                 'FILE_RECORDS = 1001',
-                 '^VICAR_HEADER = ("C3450702_GEOMED.IMG", 1)',
-                 '^IMAGE = ("C3450702_GEOMED.IMG", 2)',
-                 'DATA_SET_ID = "VG1/VG2-S-ISS-2/3/4/6-PROCESSED-V1.1"',
-                 'PRODUCT_ID = "C3450702_GEOMED.IMG"',
-                 'PRODUCT_CREATION_TIME = 2012-05-01T16:00:00'])
+                             ['PDS_VERSION_ID = PDS3',
+                              'RECORD_TYPE = FIXED_LENGTH',
+                              'RECORD_BYTES = 2000',
+                              'FILE_RECORDS = 1001',
+                              '^VICAR_HEADER = ("C3450702_GEOMED.IMG", 1)',
+                              '^IMAGE = ("C3450702_GEOMED.IMG", 2)',
+                              'DATA_SET_ID = "VG1/VG2-S-ISS-2/3/4/6-PROCESSED-V1.1"',
+                              'PRODUCT_ID = "C3450702_GEOMED.IMG"',
+                              'PRODUCT_CREATION_TIME = 2012-05-01T16:00:00'])
 
         test = Pds3Label.from_file(str(filepath))
         self.assertEqual(test.dict, d1.dict)

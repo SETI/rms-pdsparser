@@ -48,7 +48,7 @@ The typical way to use this is as follows:
 
 where `label_path` is the path to a PDS3 label file or a data file containing an attached
 PDS3 label. The returned object `label` is an object of class
-`PdsLabel`[![image](https://raw.githubusercontent.com/SETI/rms-pdsparser/main/icons/link.png)](https://rms-pdaparser.readthedocs.io/en/latest/module.html#__init__.PdsParser),
+`PdsLabel`[![image](https://raw.githubusercontent.com/SETI/rms-pdsparser/main/icons/link.png)](https://rms-pdsparser.readthedocs.io/en/latest/module.html#__init__.PdsParser),
 which supports the Python dictionary API and provides access to the content of the label.
 
 # Example 1
@@ -60,13 +60,14 @@ Suppose this is the content of a PDS3 label:
     RECORD_BYTES                    = 2000
     FILE_RECORDS                    = 1001
     ^VICAR_HEADER                   = ("C3450702_GEOMED.IMG", 1)
-    ^IMAGE                          = ("C3450702_GEOMED.IMG", 2)
+    ^IMAGE                          = ("C3450702_GEOMED.IMG", 2000 <BYTES>)
 
     /* Image Description  */
 
     INSTRUMENT_HOST_NAME            = "VOYAGER 1"
+    INSTRUMENT_HOST_NAME            = VG1
     IMAGE_TIME                      = 1980-10-29T09:58:10.00
-    FILTER_NAME                     = "VIOLET"
+    FILTER_NAME                     = VIOLET
     EXPOSURE_DURATION               = 1.920 <SECOND>
 
     DESCRIPTION                     = "This image is the result of geometrically
@@ -92,45 +93,48 @@ Suppose this is the content of a PDS3 label:
 This will be the returned dictionary:
 
     {'PDS_VERSION_ID': 'PDS3',
-      'RECORD_TYPE': 'FIXED_LENGTH',
-      'RECORD_BYTES': 2000,
-      'FILE_RECORDS': 1001,
-      '^VICAR_HEADER': 'C3450702_GEOMED.IMG',
-      '^VICAR_HEADER_offset': 1,
-      '^VICAR_HEADER_unit': '',
-      '^IMAGE': 'C3450702_GEOMED.IMG',
-      '^IMAGE_offset': 1000,
-      '^IMAGE_unit': '<BYTES>',
-      'INSTRUMENT_HOST_NAME': 'VOYAGER 1',
-      'INSTRUMENT_HOST_NAME': 'VG1',
-      'IMAGE_TIME': datetime.datetime(1980, 10, 29, 9, 58, 10),
-      'IMAGE_TIME_day': -7003,
-      'IMAGE_TIME_sec': 35890.0,
-      'IMAGE_TIME_fmt': '1980-10-29T09:58:10.000',
-      'FILTER_NAME': 'VIOLET',
-      'EXPOSURE_DURATION': 1.92,
-      'EXPOSURE_DURATION_unit': '<SECOND>',
-      'DESCRIPTION': 'This image is the result of geometrically\n
+     'RECORD_TYPE': 'FIXED_LENGTH',
+     'RECORD_BYTES': 2000,
+     'FILE_RECORDS': 1001,
+     '^VICAR_HEADER': 'C3450702_GEOMED.IMG',
+     '^VICAR_HEADER_offset': 1,
+     '^VICAR_HEADER_unit': '',
+     '^VICAR_HEADER_fmt': '("C3450702_GEOMED.IMG", 1)',
+     '^IMAGE': 'C3450702_GEOMED.IMG',
+     '^IMAGE_offset': 2000,
+     '^IMAGE_unit': '<BYTES>',
+     '^IMAGE_fmt': '("C3450702_GEOMED.IMG", 2000 <BYTES>)',
+     'INSTRUMENT_HOST_NAME': 'VOYAGER 1',
+     'INSTRUMENT_HOST_NAME_2': 'VG1',
+     'IMAGE_TIME': datetime.datetime(1980, 10, 29, 9, 58, 10),
+     'IMAGE_TIME_day': -7003,
+     'IMAGE_TIME_sec': 35890.0,
+     'IMAGE_TIME_fmt': '1980-10-29T09:58:10.000',
+     'FILTER_NAME': 'VIOLET',
+     'EXPOSURE_DURATION': 1.92,
+     'EXPOSURE_DURATION_unit': '<SECOND>',
+     'DESCRIPTION': 'This image is the result of geometrically\n
     correcting the corresponding CALIB image (C3450702_CALIB.IMG).',
-      'DESCRIPTION_unwrap': 'This image is the result of geometrically correcting the corresponding CALIB image (C3450702_CALIB.IMG).',
-      'VICAR_HEADER': {'OBJECT': 'VICAR_HEADER',
+     'DESCRIPTION_unwrap': 'This image is the result of geometrically correcting the corresponding CALIB image (C3450702_CALIB.IMG).',
+     'VICAR_HEADER': {'OBJECT': 'VICAR_HEADER',
                       'HEADER_TYPE': 'VICAR',
                       'BYTES': 2000,
                       'RECORDS': 1,
                       'INTERCHANGE_FORMAT': 'ASCII',
                       'DESCRIPTION': 'VICAR format label for the image.',
                       'END_OBJECT': 'VICAR_HEADER'},
-      'IMAGE': {'OBJECT': 'IMAGE',
-                'LINES': 1000,
-                'LINE_SAMPLES': 1000,
-                'SAMPLE_TYPE': 'LSB_INTEGER',
-                'SAMPLE_BITS': 16,
-                'BIT_MASK': 32767,
-                'BIT_MASK_radix': 16,
-                'BIT_MASK_digits': '7FFF',
-                'BIT_MASK_fmt': '16#7FFF#',
-                'END_OBJECT': 'IMAGE'},
-      'END': ''}
+     'IMAGE': {'OBJECT': 'IMAGE',
+               'LINES': 1000,
+               'LINE_SAMPLES': 1000,
+               'SAMPLE_TYPE': 'LSB_INTEGER',
+               'SAMPLE_BITS': 16,
+               'BIT_MASK': 32767,
+               'BIT_MASK_radix': 16,
+               'BIT_MASK_digits': '7FFF',
+               'BIT_MASK_fmt': '16#7FFF#',
+               'END_OBJECT': 'IMAGE'},
+     'END': '',
+     'objects': ['VICAR_HEADER', 'IMAGE']}
 
 As you can see:
 
@@ -152,10 +156,15 @@ As you can see:
   `_radix` and `_digits`. Also, the key with suffix `_fmt` provides a full, PDS3-formatted
   version of the value.
 * Dates and times are converted to Python datetime objects. However, additional dictionary
-  keys appear with the suffix `_day` for the day number relative to Janary 1, 2000; `_sec`
-  for the elapsed seconds within that day, and `_fmt` to provide an ISO-formatted
-  representation of the value.
-
+  keys appear with the suffix `_day` for the day number relative to Janary 1, 2000 and
+  `_sec` for the elapsed seconds within that day.
+* For items that have special formatting within a label, such file pointers, dates, and
+  integers with a radix, the key with a `_fmt` suffix provides the PDS3-formatted value
+  for reference.
+* Each dictionary containing OBJECTs ends with an entry keyed by "objects", which returns
+  the ordered list of all the OBJECT keys in that dictionary. Similarly, each dictionary
+  containing GROUPs has an entry keyed by "groups", which returns the list of all the
+  GROUP keys. These provide a easy way to iterate through objects and groups in the label.
 
 # Example 2
 
@@ -191,8 +200,8 @@ The returned section of the dictionary will look like this:
 
 # Example 3
 
-"Set" notation (using curly braces `{}`) was sometimes mis-used in PDS3 labels where
-"sequence" notation (using parentheses `()`) was meant. For example, this might appear in
+"Set" notation (using curly braces "{}") was sometimes mis-used in PDS3 labels where
+"sequence" notation (using parentheses "()") was meant. For example, this might appear in
 a label:
 
     CUTOUT_WINDOW = {1, 1, 200, 800}
@@ -209,7 +218,7 @@ original order and including duplicates. In this example, the dictionary contain
 # Options
 
 The
-`PdsLabel`[![image](https://raw.githubusercontent.com/SETI/rms-pdsparser/main/icons/link.png)](https://rms-pdaparser.readthedocs.io/en/latest/module.html#__init__.PdsParser.__init__),
+`PdsLabel`[![image](https://raw.githubusercontent.com/SETI/rms-pdsparser/main/icons/link.png)](https://rms-pdsparser.readthedocs.io/en/latest/module.html#__init__.PdsParser.__init__),
 constructor provides a variety of additional options for how to
 parse the label and present its content.
 
@@ -223,8 +232,8 @@ parse the label and present its content.
 * Use `expand=True` to insert the content of any referenced `^STRUCTURE` keywords into the
   returned dictionary.
 * Use `vax=True` to read attached labels from old-style Vax variable-length record files.
-* Use the `repairs` to correct any known syntax errors in the label prior to parsing using
-  regular expressions.
+* Use the `repairs` option to correct any known syntax errors in the label prior to
+  parsing using regular expressions.
 
 Three methods of parsing the label are provided.
 
@@ -249,13 +258,13 @@ Three methods of parsing the label are provided.
 
 The `pdsparser` module provides several additional utilities for handling PDS3 labels.
 
-- `read_label`[![image](https://raw.githubusercontent.com/SETI/rms-pdsparser/main/icons/link.png)](https://rms-pdaparser.readthedocs.io/en/latest/module.html#_utils.read_label):
+- `read_label`[![image](https://raw.githubusercontent.com/SETI/rms-pdsparser/main/icons/link.png)](https://rms-pdsparser.readthedocs.io/en/latest/module.html#_utils.read_label):
   Reads a PDS3 label from a file. Supports attached labels
   within binary files.
-- `read_vax_binary_label`[![image](https://raw.githubusercontent.com/SETI/rms-pdsparser/main/icons/link.png)](https://rms-pdaparser.readthedocs.io/en/latest/module.html#_utils.read_vax_binary_label):
+- `read_vax_binary_label`[![image](https://raw.githubusercontent.com/SETI/rms-pdsparser/main/icons/link.png)](https://rms-pdsparser.readthedocs.io/en/latest/module.html#_utils.read_vax_binary_label):
   Reads the attached PDS3 label from an old-style
   Vax binary file that uses variable-length records.
-- `expand_structures`[![image](https://raw.githubusercontent.com/SETI/rms-pdsparser/main/icons/link.png)](https://rms-pdaparser.readthedocs.io/en/latest/module.html#_utils.expand_structures):
+- `expand_structures`[![image](https://raw.githubusercontent.com/SETI/rms-pdsparser/main/icons/link.png)](https://rms-pdsparser.readthedocs.io/en/latest/module.html#_utils.expand_structures):
   Replaces any `^STRUCTURE` keywords in a label string
   with the content of the associated ".FMT" files.
 

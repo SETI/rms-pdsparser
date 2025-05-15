@@ -26,13 +26,14 @@ Suppose this is the content of a PDS3 label::
     RECORD_BYTES                    = 2000
     FILE_RECORDS                    = 1001
     ^VICAR_HEADER                   = ("C3450702_GEOMED.IMG", 1)
-    ^IMAGE                          = ("C3450702_GEOMED.IMG", 2)
+    ^IMAGE                          = ("C3450702_GEOMED.IMG", 2000 <BYTES>)
 
     /* Image Description  */
 
     INSTRUMENT_HOST_NAME            = "VOYAGER 1"
+    INSTRUMENT_HOST_NAME            = VG1
     IMAGE_TIME                      = 1980-10-29T09:58:10.00
-    FILTER_NAME                     = "VIOLET"
+    FILTER_NAME                     = VIOLET
     EXPOSURE_DURATION               = 1.920 <SECOND>
 
     DESCRIPTION                     = "This image is the result of geometrically
@@ -64,11 +65,13 @@ The returned dictionary will be as follows::
      '^VICAR_HEADER': 'C3450702_GEOMED.IMG',
      '^VICAR_HEADER_offset': 1,
      '^VICAR_HEADER_unit': '',
+     '^VICAR_HEADER_fmt': '("C3450702_GEOMED.IMG", 1)',
      '^IMAGE': 'C3450702_GEOMED.IMG',
-     '^IMAGE_offset': 1000,
+     '^IMAGE_offset': 2000,
      '^IMAGE_unit': '<BYTES>',
+     '^IMAGE_fmt': '("C3450702_GEOMED.IMG", 2000 <BYTES>)',
      'INSTRUMENT_HOST_NAME': 'VOYAGER 1',
-     'INSTRUMENT_HOST_NAME': 'VG1',
+     'INSTRUMENT_HOST_NAME_2': 'VG1',
      'IMAGE_TIME': datetime.datetime(1980, 10, 29, 9, 58, 10),
      'IMAGE_TIME_day': -7003,
      'IMAGE_TIME_sec': 35890.0,
@@ -97,7 +100,8 @@ The returned dictionary will be as follows::
                'BIT_MASK_digits': '7FFF',
                'BIT_MASK_fmt': '16#7FFF#',
                'END_OBJECT': 'IMAGE'},
-     'END': ''}
+     'END': '',
+     'objects': ['VICAR_HEADER', 'IMAGE']}
 
 As you can see:
 
@@ -119,9 +123,15 @@ As you can see:
   "_radix" and "_digits". Also, the key with suffix "_fmt" provides a full, PDS3-formatted
   version of the value.
 * Dates and times are converted to Python datetime objects. However, additional dictionary
-  keys appear with the suffix "_day" for the day number relative to Janary 1, 2000; "_sec"
-  for the elapsed seconds within that day, and "_fmt" to provide an ISO-formatted
-  representation of the value.
+  keys appear with the suffix "_day" for the day number relative to Janary 1, 2000 and
+  "_sec" for the elapsed seconds within that day.
+* For items that have special formatting within a label, such file pointers, dates, and
+  integers with a radix, the key with a "_fmt" suffix provides the PDS3-formatted value
+  for reference.
+* Each dictionary containing OBJECTs ends with an entry keyed by "objects", which returns
+  the ordered list of all the OBJECT keys in that dictionary. Similarly, each dictionary
+  containing GROUPs has an entry keyed by "groups", which returns the list of all the
+  GROUP keys. These provide a easy way to iterate through objects and groups in the label.
 
 #########
 Example 2
@@ -155,7 +165,7 @@ The returned section of the dictionary will look like this::
                                            'START_BYTE': 15,
                                            'END_OBJECT': 'COLUMN'},
                'END_OBJECT': 'TABLE'},
-    }
+               'objects': ['VOLUME_ID', 'FILE_SPECIFICATION_NAME']}
 
 #########
 Example 3
@@ -540,12 +550,19 @@ class Pds3Label():
 
         def from_item_dict(item_dict):
             dict_ = {}
+            object_keys = []
+            group_keys = []
             for key, item in item_dict.items():
-                if key.endswith('_source'):
+                if key.endswith('_source'):             # save these for below
                     continue
 
                 if isinstance(item, dict):
-                    dict_[key] = from_item_dict(item)   # recursive call
+                    local_dict = from_item_dict(item)   # recursive call
+                    dict_[key] = local_dict
+                    if 'OBJECT' in local_dict:
+                        object_keys.append(key)
+                    else:
+                        group_keys.append(key)
                     continue
 
                 if not item:
@@ -564,6 +581,11 @@ class Pds3Label():
 
                 if details:
                     dict_[key + '_detail'] = item
+
+            if object_keys:
+                dict_['objects'] = object_keys
+            if group_keys:
+                dict_['groups'] = group_keys
 
             # When there's no associated object, the "_source" key provided initem_dict
             # contains the override source value. Used for END_OBJECT with no value.

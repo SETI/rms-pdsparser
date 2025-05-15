@@ -15,11 +15,13 @@
  '^VICAR_HEADER_source': '("C3450702_GEOMED.IMG", 1)',
  '^VICAR_HEADER_offset': 1,
  '^VICAR_HEADER_unit': '',
+ '^VICAR_HEADER_fmt': '("C3450702_GEOMED.IMG", 1)',
  '^IMAGE': 'C3450702_GEOMED.IMG',
  '^IMAGE_type': 'file_offset_pointer',
  '^IMAGE_source': '("C3450702_GEOMED.IMG", 2)',
  '^IMAGE_offset': 2,
  '^IMAGE_unit': '',
+ '^IMAGE_fmt': '("C3450702_GEOMED.IMG", 2)',
  'DATA_SET_ID': 'VG1/VG2-S-ISS-2/3/4/6-PROCESSED-V1.1',
  'DATA_SET_ID_type': 'quoted_text',
  'DATA_SET_ID_source': '"VG1/VG2-S-ISS-2/3/4/6-PROCESSED-V1.1"',
@@ -185,4 +187,5 @@
   'END_OBJECT': 'IMAGE',
   'END_OBJECT_type': 'identifier',
   'END_OBJECT_source': 'IMAGE'},
- 'END': ''}
+ 'END': '',
+ 'objects': ['VICAR_HEADER', 'IMAGE']}

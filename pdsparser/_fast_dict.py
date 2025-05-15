@@ -169,6 +169,8 @@ def _evaluate(value, recno, name):
         info['quote'] = quote
         info['type'] = ('file_pointer' if is_pointer
                         else 'quoted_text' if quote == '"' else 'quoted_symbol')
+        if is_pointer:
+            info['fmt'] = '"' + value + '"'
         return (value, info)
 
     # Extract units
@@ -240,13 +242,16 @@ def _evaluate(value, recno, name):
             info['type'] = 'file_offset_pointer'
             info['offset'] = value[1]
             unit = info.get('unit', '')
+            info['unit'] = unit.upper()
             value = value[0]
             if unit:
                 info['source'] = ('("' + value + '", ' + str(info['offset'])
                                   + ' ' + unit + ')')
+                info['fmt'] = ('("' + value + '", ' + str(info['offset'])
+                               + ' ' + unit.upper() + ')')
             else:
                 info['source'] = '("' + value + '", ' + str(info['offset']) + ')'
-            info['unit'] = unit.upper()
+                info['fmt'] = info['source']
         else:
             info['type'] = 'sequence_pointer'
 
@@ -264,6 +269,7 @@ def _evaluate(value, recno, name):
         if is_pointer:
             info['type'] = 'offset_pointer'
             info['unit'] = info.get('unit', '').upper()
+            info['fmt'] = str(value) + (' ' + info['unit'] if info['unit'] else '')
         else:
             info['type'] = 'integer'
     elif isinstance(value, float):
@@ -282,6 +288,8 @@ def _to_dict(lines, types=False, sources=False):
         removals.add('source')
 
     state = [('', '', {})]   # list of (OBJECT or GROUP, name, dict)
+    object_keys = [[]]
+    group_keys = [[]]
     statements = []
     for recno, line in lines:
 
@@ -308,6 +316,8 @@ def _to_dict(lines, types=False, sources=False):
                 dict_[name + '_' + suffix] = extra_value
 
             state.append((name, value, dict_))
+            object_keys.append([])
+            group_keys.append([])
 
         # If this ends an object, add this sub-dictionary to the dictionary
         elif name in {'END_OBJECT', 'END_GROUP'}:
@@ -330,11 +340,22 @@ def _to_dict(lines, types=False, sources=False):
                 for suffix, extra_value in info.items():
                     obj_dict[name + '_' + suffix] = extra_value
 
+            objects = object_keys.pop()
+            if objects:
+                obj_dict['objects'] = objects
+            groups = group_keys.pop()
+            if groups:
+                obj_dict['groups'] = groups
+
             dict_ = state[-1][-1]
             if obj_name in {'COLUMN', 'FIELD', 'BIT_COLUMN'} and 'NAME' in obj_dict:
                 obj_name = obj_dict['NAME']
             key = _unique_key(obj_name, dict_)
             dict_[key] = obj_dict
+            if name == 'END_OBJECT':
+                object_keys[-1].append(key)
+            else:
+                group_keys[-1].append(key)
 
         # Otherwise, interpret an attribute value
         else:
@@ -353,6 +374,11 @@ def _to_dict(lines, types=False, sources=False):
         raise SyntaxError(f'unbalanced {obj_type} = {obj_name} at line {recno}')
 
     obj_dict['END'] = ''
+    if object_keys[-1]:
+        obj_dict['objects'] = object_keys[-1]
+    if group_keys[-1]:
+        obj_dict['groups'] = group_keys[-1]
+
     statements.append(('END', ''))
     return obj_dict, statements
 
