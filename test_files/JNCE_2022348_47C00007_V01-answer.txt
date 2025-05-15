@@ -13,6 +13,7 @@
  '^IMAGE': 'JNCE_2022348_47C00007_V01.IMG',
  '^IMAGE_type': 'file_pointer',
  '^IMAGE_source': '"JNCE_2022348_47C00007_V01.IMG"',
+ '^IMAGE_fmt': '"JNCE_2022348_47C00007_V01.IMG"',
  'FILE_NAME': 'JNCE_2022348_47C00007_V01.IMG',
  'FILE_NAME_type': 'quoted_text',
  'FILE_NAME_source': '"JNCE_2022348_47C00007_V01.IMG"',
@@ -169,4 +170,5 @@
   'END_OBJECT': 'IMAGE',
   'END_OBJECT_type': 'identifier',
   'END_OBJECT_source': 'IMAGE'},
- 'END': ''}
+ 'END': '',
+ 'objects': ['IMAGE']}

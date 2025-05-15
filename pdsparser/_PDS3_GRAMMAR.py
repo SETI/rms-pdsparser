@@ -5,8 +5,8 @@
 
 import datetime as dt
 from pyparsing import (alphanums, alphas, CharsNotIn, Combine, hexnums, Literal, nums,
-                       one_of, OneOrMore, Optional, ParserElement,
-                       StringEnd, Suppress, Word, ZeroOrMore)
+                       one_of, OneOrMore, Optional, ParserElement, StringEnd, Suppress,
+                       Word, ZeroOrMore)
 
 try:
     from ._version import __version__
@@ -21,6 +21,7 @@ _COMMENT = Literal('/*') + CharsNotIn('\r\n')
 _EOL = Suppress(OneOrMore(_WHITE + Optional(_COMMENT) + Word('\r\n')))
 _SKIP = Suppress(ZeroOrMore(_COMMENT | Word(' \t\r\n')))
 _EQUAL = _WHITE + Suppress('=') + _SKIP
+_WHITE = Suppress(Optional(Word(' \t\r\n')))
 
 _caps = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
 _middle = _caps + nums
@@ -776,6 +777,7 @@ class _SimplePointer(_Pointer):
     type_ = 'file_pointer'
     grammar = _SIMPLE_POINTER
     alt_grammar = _ALT_SIMPLE_POINTER
+    suffixes = ('fmt',)
 
     def __init__(self, s, loc, tokens):
         self.tokens = tokens
@@ -784,9 +786,14 @@ class _SimplePointer(_Pointer):
             self.quote = "'" if tokens[1] == "'" else '"'
         else:
             self.quote = '"'
+        self.fmt = str(self)
+
+    @property
+    def source(self):
+        return self.quote + self.tokens[0] + self.quote
 
     def __str__(self):
-        return self.quote + self.tokens[0] + self.quote
+        return '"' + self.tokens[0] + '"'
 
 _SIMPLE_POINTER.set_parse_action(_SimplePointer)
 _ALT_SIMPLE_POINTER.set_parse_action(_SimplePointer)
@@ -805,12 +812,13 @@ class _LocalPointer(_Pointer):
 
     type_ = 'offset_pointer'
     grammar = _LOCAL_POINTER
-    suffixes = ('unit',)
+    suffixes = ('unit', 'fmt')
 
     def __init__(self, s, loc, tokens):
         self.tokens = tokens
         self.value = int(tokens[0])
         self.unit = '<BYTES>' if len(tokens) > 1 else ''
+        self.fmt = str(self)
 
     def __str__(self):
         return str(self.value) + (' <BYTES>' if self.unit else '')
@@ -842,14 +850,19 @@ class _OffsetPointer(_Pointer):
     type_ = 'file_offset_pointer'
     grammar = _OFFSET_POINTER
     alt_grammar = _ALT_OFFSET_POINTER
-    suffixes = ('offset', 'unit',)
+    suffixes = ('offset', 'unit', 'fmt')
 
     def __init__(self, s, loc, tokens):
-        self.items = tokens
+        self.tokens = tokens
         self.value = tokens[0].value
         self.offset = tokens[1].value
         self.unit = tokens[1].unit
         self.quote = '"'
+        self.fmt = str(self)
+
+    @property
+    def source(self):
+        return '(' + self.tokens[0].source + ', ' + self.tokens[1].source + ')'
 
     @property
     def full_value(self):
@@ -1054,8 +1067,8 @@ class _EndStatement(_Item):
 
 _END_STATEMENT.set_parse_action(_EndStatement)
 
-_PDS3_LABEL = OneOrMore(_STATEMENT) + _END_STATEMENT + ZeroOrMore(_EOL) + StringEnd()
-_ALT_PDS3_LABEL = (ZeroOrMore(_EOL) + OneOrMore(_ALT_STATEMENT) + Optional(_END_STATEMENT)
-                   + ZeroOrMore(_EOL) + StringEnd())
+_PDS3_LABEL = _WHITE + OneOrMore(_STATEMENT) + _END_STATEMENT + _WHITE + StringEnd()
+_ALT_PDS3_LABEL = (_WHITE + OneOrMore(_ALT_STATEMENT) + Optional(_END_STATEMENT)
+                   + _WHITE + StringEnd())
 
 ##########################################################################################

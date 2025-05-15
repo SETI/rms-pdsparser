@@ -5,9 +5,11 @@
  '^VICAR_HEADER': 'C3450702_GEOMED.IMG',
  '^VICAR_HEADER_offset': 1,
  '^VICAR_HEADER_unit': '',
+ '^VICAR_HEADER_fmt': '("C3450702_GEOMED.IMG", 1)',
  '^IMAGE': 'C3450702_GEOMED.IMG',
  '^IMAGE_offset': 2,
  '^IMAGE_unit': '',
+ '^IMAGE_fmt': '("C3450702_GEOMED.IMG", 2)',
  'DATA_SET_ID': 'VG1/VG2-S-ISS-2/3/4/6-PROCESSED-V1.1',
  'PRODUCT_ID': 'C3450702_GEOMED.IMG',
  'PRODUCT_CREATION_TIME': datetime.datetime(2012, 5, 1, 16, 0),
@@ -77,4 +79,5 @@
   'VERTICAL_FOV_unit': '<DEGREE>',
   'REFLECTANCE_SCALING_FACTOR': 0.0003345,
   'END_OBJECT': 'IMAGE'},
- 'END': ''}
+ 'END': '',
+ 'objects': ['VICAR_HEADER', 'IMAGE']}
