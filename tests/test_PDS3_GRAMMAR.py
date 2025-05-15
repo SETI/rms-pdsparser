@@ -31,6 +31,11 @@ from pdsparser._PDS3_GRAMMAR import (_Integer,
                                      _Statement,
                                      _EndStatement)
 
+
+def tz(minutes):
+    return dt.timezone(dt.timedelta(seconds=60 * minutes))
+
+
 def _pass(testcase, type_, string, value, strval=None, vtype=None, test=3, super_=True):
     """Test grammar(s) for success, using parsers for this class and all superclasses.
 
@@ -249,8 +254,6 @@ class Test_TimeZone(unittest.TestCase):
 
     def runTest(self):
 
-        tz = lambda minutes: dt.timezone(dt.timedelta(seconds=60 * minutes))
-
         _pass(self, _TimeZone, '+2:30', tz(2*60 + 30), '+02:30', dt.timezone)
         _pass(self, _TimeZone, '+0:30', tz(30), '+00:30')
         _pass(self, _TimeZone, '-0:30', tz(-30), '-00:30')
@@ -283,8 +286,6 @@ class Test_ZonedTime(unittest.TestCase):
 
     def runTest(self):
 
-        tz = lambda minutes: dt.timezone(dt.timedelta(seconds=60 * minutes))
-
         obj = _pass(self, _ZonedTime, '12:34+2', dt.time(12, 34, tzinfo=tz(2*60)),
                     '12:34:00+02:00', dt.time, test=2, super_=False)
         self.assertEqual(obj.type_, 'zoned_time')
@@ -304,9 +305,9 @@ class Test_ZonedTime(unittest.TestCase):
         self.assertEqual(obj.source, '12:34+2:30')
 
         _pass(self, _ZonedTime, '"12:34-02"', dt.time(12, 34, tzinfo=tz(-2*60)),
-                    '12:34:00-02:00', dt.time, test=2, super_=False)
+              '12:34:00-02:00', dt.time, test=2, super_=False)
         _pass(self, _ZonedTime, '"12:34-02:45"', dt.time(12, 34, tzinfo=tz(-2*60 - 45)),
-                    '12:34:00-02:45', dt.time, test=2, super_=False)
+              '12:34:00-02:45', dt.time, test=2, super_=False)
 
         _fail(self, _ZonedTime, '12:34 +2:30',)
         _fail(self, _ZonedTime, '12:34 +02:30',)
@@ -317,8 +318,6 @@ class Test_ZonedTime(unittest.TestCase):
 class Test_Time(unittest.TestCase):
 
     def runTest(self):
-
-        tz = lambda minutes: dt.timezone(dt.timedelta(seconds=60 * minutes))
 
         obj = _pass(self, _Time, '12:34:56', dt.time(12, 34, 56))
         self.assertEqual(obj.type_, 'local_time')
@@ -397,10 +396,8 @@ class Test_DateTime(unittest.TestCase):
 
     def runTest(self):
 
-        tz = lambda minutes: dt.timezone(dt.timedelta(seconds=60 * minutes))
-
         obj = _pass(self, _DateTime, '2000-01-03T12:34', dt.datetime(2000, 1, 3, 12, 34),
-              '2000-01-03T12:34:00', test=1)
+                    '2000-01-03T12:34:00', test=1)
         self.assertEqual(obj.type_, 'date_time')
         self.assertEqual(obj.day, 2)
         self.assertEqual(obj.sec, 60 * (34 + 60 * 12))
@@ -656,14 +653,14 @@ class Test_OffsetPointer(unittest.TestCase):
     def runTest(self):
 
         obj = _pass(self, _OffsetPointer, '("TABLE.TAB", 2)', "TABLE.TAB",
-              '("TABLE.TAB", 2)')
+                    '("TABLE.TAB", 2)')
         self.assertEqual(obj.full_value, ("TABLE.TAB", 2))
         self.assertEqual(obj.offset, 2)
         self.assertIsInstance(obj.offset, int)
         self.assertEqual(obj.unit, '')
 
         obj = _pass(self, _OffsetPointer, '("TABLE.TAB", 800 <bytes>)',
-              "TABLE.TAB", '("TABLE.TAB", 800 <BYTES>)')
+                    "TABLE.TAB", '("TABLE.TAB", 800 <BYTES>)')
         self.assertEqual(obj.full_value, ("TABLE.TAB", 800, '<BYTES>'))
         self.assertEqual(obj.offset, 800)
         self.assertIsInstance(obj.offset, int)

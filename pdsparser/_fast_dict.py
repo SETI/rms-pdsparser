@@ -248,7 +248,7 @@ def _evaluate(value, recno, name):
                 info['source'] = ('("' + value + '", ' + str(info['offset'])
                                   + ' ' + unit + ')')
                 info['fmt'] = ('("' + value + '", ' + str(info['offset'])
-                                  + ' ' + unit.upper() + ')')
+                               + ' ' + unit.upper() + ')')
             else:
                 info['source'] = '("' + value + '", ' + str(info['offset']) + ')'
                 info['fmt'] = info['source']
