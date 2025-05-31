@@ -1165,5 +1165,5 @@
   'END_OBJECT_type': 'identifier',
   'END_OBJECT_source': 'SPECTRAL_QUBE',
   'groups': ['SAMPLE_SUFFIX', 'BAND_SUFFIX', 'BAND_BIN']},
- 'END': '',
+ 'END': None,
  'objects': ['HEADER', 'HISTORY', 'SPECTRAL_QUBE']}

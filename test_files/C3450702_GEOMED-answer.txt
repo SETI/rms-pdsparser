@@ -187,5 +187,5 @@
   'END_OBJECT': 'IMAGE',
   'END_OBJECT_type': 'identifier',
   'END_OBJECT_source': 'IMAGE'},
- 'END': '',
+ 'END': None,
  'objects': ['VICAR_HEADER', 'IMAGE']}

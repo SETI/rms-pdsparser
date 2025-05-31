@@ -166,7 +166,7 @@
   'END_OBJECT': 'IMAGE',
   'END_OBJECT_type': 'identifier',
   'END_OBJECT_source': ''},
- 'END': '',
+ 'END': None,
  'objects': ['IMAGE_HISTOGRAM',
   'ENCODING_HISTOGRAM',
   'ENGINEERING_TABLE',

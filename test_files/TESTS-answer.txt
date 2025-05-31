@@ -385,4 +385,4 @@
  'QDATE_DOY_9_day': 9231,
  'QDATE_DOY_9_sec': 45296.7890123456,
  'QDATE_DOY_9_fmt': '2025-100T12:34:56.789012',
- 'END': ''}
+ 'END': None}

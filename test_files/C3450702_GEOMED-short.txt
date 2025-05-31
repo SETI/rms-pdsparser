@@ -79,5 +79,5 @@
   'VERTICAL_FOV_unit': '<DEGREE>',
   'REFLECTANCE_SCALING_FACTOR': 0.0003345,
   'END_OBJECT': 'IMAGE'},
- 'END': '',
+ 'END': None,
  'objects': ['VICAR_HEADER', 'IMAGE']}

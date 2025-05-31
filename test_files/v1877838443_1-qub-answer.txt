@@ -1113,5 +1113,5 @@
   'END_OBJECT_type': 'identifier',
   'END_OBJECT_source': 'QUBE',
   'groups': ['BAND_BIN']},
- 'END': '',
+ 'END': None,
  'objects': ['HISTORY', 'QUBE']}

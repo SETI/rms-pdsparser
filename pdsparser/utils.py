@@ -114,13 +114,18 @@ def read_vax_binary_label(filepath):
     return content.decode('latin-1')
 
 
-def expand_structures(content, fmt_dirs=[], *, label_path=None):
+def expand_structures(content, fmt_dirs=[], *, repairs=[], label_path=None):
     """Replace any ^STRUCTURE keywords in the label with the content of the associated
     ".FMT" files.
 
     Parameters:
         fmt_dirs (str, pathlib.Path, filecache.FCPath, or list, optional):
             One or more directory paths to search for the ".FMT" files.
+        repairs (tuple or list[tuple]):
+            One or more two-element tuples of the form (pattern, replacement), where the
+            first item is a regular expression and the second is the string with which to
+            replace it. These repair patterns are applied to the label content before it
+            is parsed, and make it possible to repair known syntax errors.
         label_path (str, pathlib.Path, filecache.FCPath, optional):
             The path to the label file from which the content was obtained; if provided,
             the parent directory of this files is the first to be searched for .FMT files.
@@ -143,6 +148,8 @@ def expand_structures(content, fmt_dirs=[], *, label_path=None):
     fmt_dirs = [FCPath(dir) for dir in fmt_dirs]
     if label_path:
         fmt_dirs = [FCPath(label_path).parent] + fmt_dirs
+    if not fmt_dirs:        # if no path is provided, search the local default dir
+        fmt_dirs = [FCPath('.')]
 
     # Replace ^STRUCTURE keywords, one by one...
     while (match := _STRUCTURE.search(content)):
@@ -163,6 +170,12 @@ def expand_structures(content, fmt_dirs=[], *, label_path=None):
         # Don't include END from .FMT file
         if match := _END.search(fmt_content):
             fmt_content = fmt_content[:match.start()]
+
+        # Repair content if necessary
+        if isinstance(repairs, tuple):
+            repairs = [repairs]
+        for repair in repairs:
+            fmt_content = re.sub(repair[0], repair[1], fmt_content)
 
         # Replace
         content = content[:k0] + fmt_content + content[k1:]
@@ -204,7 +217,7 @@ def _is_identifier(text):
     return text.isalnum()
 
 
-def _unique_key(name, dict_):
+def _unique_key(name, dict_, dups=None):
     """This name if it is not in the dict_; otherwise with a numeric suffix appended to
     make it unique.
     """
@@ -215,6 +228,9 @@ def _unique_key(name, dict_):
     indx = 2
     while (key := name + '_' + str(indx)) in dict_:
         indx += 1
+
+    if dups is not None:
+        dups.add(name)
 
     return key
 

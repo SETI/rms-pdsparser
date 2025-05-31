@@ -200,6 +200,8 @@ class Test_NumberWithUnit(unittest.TestCase):
         obj = _pass(self, _NumberWithUnit, '+1 < local day >', 1, '1 <local day>', int)
         self.assertEqual(obj.unit, '<local day>')
 
+        self.assertEqual(_NumberWithUnit.grammar.parse_string('100 <km>')[0], 100)
+
 
 class Test_SimpleTime(unittest.TestCase):
 
@@ -520,6 +522,29 @@ class Test_Set(unittest.TestCase):
         self.assertEqual(obj.unit, '<km>')
         self.assertEqual(type(obj[0]), _NumberWithUnit)
 
+        obj = _pass(self, _Set, '{1, "abc", \'def\', GHI}', {1, "abc", "def", "GHI"},
+                    '{1, "abc", \'def\', "GHI"}')
+        self.assertEqual(type(obj[1]), _Text)
+        self.assertEqual(obj[1].value, 'abc')
+        self.assertEqual(obj[1].quote, '"')
+        self.assertEqual(type(obj[2]), _Text)
+        self.assertEqual(obj[2].value, 'def')
+        self.assertEqual(obj[2].quote, "'")
+        self.assertEqual(type(obj[3]), _Text)
+        self.assertEqual(obj[3].value, 'GHI')
+        self.assertEqual(obj[3].quote, '')
+        self.assertEqual(obj.quote, '"')
+
+        obj = _pass(self, _Set, '{1, \'def\', GHI}', {1, "def", "GHI"},
+                    '{1, \'def\', "GHI"}')
+        self.assertEqual(obj[1].quote, "'")
+        self.assertEqual(obj[2].quote, '')
+        self.assertEqual(obj.quote, "'")
+
+        obj = _pass(self, _Set, '{1, GHI}', {1, "GHI"}, '{1, "GHI"}')
+        self.assertEqual(obj[1].quote, '')
+        self.assertEqual(obj.quote, '')
+
         _fail(self, _Set, '{1, (2, 3)}')
         _fail(self, _Set, '{1, {2, 3}}')
         _fail(self, _Set, '{1, 2.0, three}', test=1)
@@ -679,7 +704,9 @@ class Test_SetPointer(unittest.TestCase):
 
     def runTest(self):
 
-        _pass(self, _SetPointer, '{"1.GIF", "2.GIF", "3.GIF"}',
+#         _pass(self, _SetPointer, '{"1.GIF", "2.GIF", "3.GIF"}',
+#               {"1.GIF", "2.GIF", "3.GIF"}, '{"1.GIF", "2.GIF", "3.GIF"}')
+        _pass(self, _SetPointer, '{"1.GIF", "2.GIF", "2.GIF", "3.GIF"}',
               {"1.GIF", "2.GIF", "3.GIF"}, '{"1.GIF", "2.GIF", "3.GIF"}')
         _pass(self, _SetPointer, '{"A/1.GIF", "A/2.GIF", "A/3.GIF"}',
               {"A/1.GIF", "A/2.GIF", "A/3.GIF"}, '{"A/1.GIF", "A/2.GIF", "A/3.GIF"}',
@@ -756,7 +783,7 @@ class Test_EndStatement(unittest.TestCase):
 
     def runTest(self):
 
-        _pass(self, _EndStatement, 'END  \t\r\n', ('END', ''), 'END')
+        _pass(self, _EndStatement, 'END  \t\r\n', ('END', None), 'END')
 
 
 ##########################################################################################

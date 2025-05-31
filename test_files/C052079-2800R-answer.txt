@@ -399,7 +399,7 @@
   'END_OBJECT': 'IMAGE',
   'END_OBJECT_type': 'identifier',
   'END_OBJECT_source': ''},
- 'END': '',
+ 'END': None,
  'objects': ['IMAGE_HEADER',
   'TELEMETRY_TABLE',
   'BAD_DATA_VALUES_HEADER',

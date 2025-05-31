@@ -10,7 +10,7 @@ from pyparsing import (alphanums, alphas, CharsNotIn, Combine, hexnums, Literal,
 
 try:
     from ._version import __version__
-except ImportError:
+except ImportError:     # pragma: no cover
     __version__ = 'Version unspecified'
 
 from .utils import _based_int, _format_float, _is_identifier, _unwrap
@@ -51,6 +51,11 @@ class _Item():
             return type(self).__name__ + str(self)
         return type(self).__name__ + '(' + str(self) + ')'
 
+    def __eq__(self, other):
+        if isinstance(other, _Value):
+            return type(self) is type(other) and self.value == other.value
+        return self.value == other
+
     def quote_if_text(self):
         """Put quotes around all string values; overridden by _Text."""
         return str(self)
@@ -68,13 +73,8 @@ class _Value(_Item):
     PDS3 label.
     """
 
-    def __str__(self):
+    def __str__(self):      # pragma: no cover (always overridden)
         return str(self.value)
-
-    def __eq__(self, other):
-        if isinstance(other, _Value):
-            return type(self) is type(other) and self.value == other.value
-        return self.value == other
 
 class _Scalar(_Value):
     """Abstract class for any single value that can appear on the right side of an equal
@@ -586,7 +586,8 @@ class _Vector(_Value):
         unique_quotes = {item.__dict__.get('quote', None) for item in self.items} - {None}
         if unique_quotes:
             self.suffixes + ('quote',)
-            for quote in ('"', "'", ''):
+            self.quote = ''
+            for quote in ('"', "'"):
                 if quote in unique_quotes:
                     self.quote = quote
                     break
@@ -1059,8 +1060,8 @@ class _EndStatement(_Item):
     def __init__(self, s, loc, tokens):
         self.tokens = tokens
         self.name = 'END'
-        self.item = ''
-        self.value = ('END', '')
+        self.item = None
+        self.value = ('END', None)
 
     def __str__(self):
         return 'END'
