@@ -181,7 +181,10 @@ which is supposed to define the four boundaries of an image region. The user mig
 surprised to learn that in the dictionary, its value is the Python set {1, 200, 800}. To
 address this situation, for every set value, the dictionary also has a key with the same
 name but suffix "_list", which contains the elements of the value as list in their
-original order and including duplicates.
+original order and including duplicates. In this example, the dictionary contains::
+
+    'CUTOUT_WINDOW': {1, 200, 800},
+    'CUTOUT_WINDOW_list': [1, 1, 200, 800]
 
 #######
 Options
