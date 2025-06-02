@@ -95,7 +95,6 @@ class Test_labels(unittest.TestCase):
         self.assertRaisesRegex(SyntaxError, 'unbalanced END_OBJECT',
                                Pds3Label, filepath, method='loose')
 
-
     def test_GOxxx_v1(self):
 
         self.maxDiff = MAXDIFF

@@ -704,8 +704,8 @@ class Test_SetPointer(unittest.TestCase):
 
     def runTest(self):
 
-#         _pass(self, _SetPointer, '{"1.GIF", "2.GIF", "3.GIF"}',
-#               {"1.GIF", "2.GIF", "3.GIF"}, '{"1.GIF", "2.GIF", "3.GIF"}')
+        _pass(self, _SetPointer, '{"1.GIF", "2.GIF", "3.GIF"}',
+              {"1.GIF", "2.GIF", "3.GIF"}, '{"1.GIF", "2.GIF", "3.GIF"}')
         _pass(self, _SetPointer, '{"1.GIF", "2.GIF", "2.GIF", "3.GIF"}',
               {"1.GIF", "2.GIF", "3.GIF"}, '{"1.GIF", "2.GIF", "3.GIF"}')
         _pass(self, _SetPointer, '{"A/1.GIF", "A/2.GIF", "A/3.GIF"}',
