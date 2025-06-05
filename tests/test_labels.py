@@ -9,6 +9,7 @@ import unittest
 
 from filecache import FCPath
 from pdsparser import Pds3Label, PdsLabel
+from pdsparser._PDS3_GRAMMAR import _Text, _Integer
 
 ROOT_DIR = pathlib.Path(sys.modules['pdsparser'].__file__).parent.parent
 TEST_FILE_DIR = ROOT_DIR / 'test_files'
@@ -59,6 +60,10 @@ class Test_labels(unittest.TestCase):
         answer_dict = eval(answer)
         self.assertEqual(d1.dict, answer_dict)
 
+        d1 = Pds3Label(filepath, method='loose', types=True, sources=True, expand=True,
+                       fmt_dirs=['./'])     # this value of fmt_dirs is not used
+        self.assertEqual(d1.dict, answer_dict)
+
         d2 = Pds3Label(filepath, method='fast', types=True, sources=True, expand=True)
         self.assertEqual(d2.dict, answer_dict)
 
@@ -107,6 +112,11 @@ class Test_labels(unittest.TestCase):
 
         d2 = Pds3Label(filepath, method='fast', types=True, sources=True, expand=False)
         self.assertEqual(d2.dict, eval(answer))
+
+        # vax=True doesn't matter if this is a label file
+        d3 = Pds3Label(filepath, method='loose', types=True, sources=True, expand=False,
+                       vax=True)
+        self.assertEqual(d3.dict, eval(answer))
 
         d1 = Pds3Label(filepath, method='loose', types=True, sources=True, expand=True)
         answer = (TEST_FILE_DIR / (root + '-expanded.txt')).read_text()
@@ -242,6 +252,16 @@ class Test_labels(unittest.TestCase):
         self.assertEqual(detail.value, 'VIOLET')
         self.assertEqual(str(detail), 'VIOLET')
 
+        # Failover from data file to detached label
+        root = 'C3450702_GEOMED'
+        filepath = TEST_FILE_DIR / (root + '.empty')
+        d1 = Pds3Label(filepath, method='strict', types=True, sources=True)
+        answer = (TEST_FILE_DIR / (root + '-answer.txt')).read_text()
+        self.assertEqual(d1.dict, eval(answer))
+
+        d1 = Pds3Label(filepath, method='strict', types=True, sources=True, vax=True)
+        self.assertEqual(d1.dict, eval(answer))
+
     def test_VG_0xxx(self):
 
         self.maxDiff = MAXDIFF
@@ -368,6 +388,13 @@ class Test_labels(unittest.TestCase):
         self.assertRaises(ValueError, PdsLabel, filepath, method='whatever')
         self.assertRaises(ValueError, PdsLabel, 999)
 
+        # Attached label failure
+        filepath = TEST_FILE_DIR / 'empty.dat'
+        self.assertRaisesRegex(SyntaxError, r'missing END statement in .*empty\.dat',
+                               Pds3Label, filepath)
+        self.assertRaisesRegex(SyntaxError, r'missing END statement in .*empty\.dat',
+                               Pds3Label, filepath, vax=True)
+
         # __setitem__
         d4['FOO'] = 'BAR'
         self.assertEqual(d4.dict['FOO'], 'BAR')
@@ -417,6 +444,18 @@ class Test_labels(unittest.TestCase):
         content = 'VALUE\nEND\n'
         self.assertRaisesRegex(SyntaxError, 'missing "=" at VALUE, line 1',
                                Pds3Label, content, method='fast')
+
+        # _details=True
+        content = 'OBJECT = TEST\nVALUE = 7\nEND_OBJECT\nEND\n'
+        d1 = Pds3Label(content, method='loose', _details=True)
+        self.assertEqual(d1.dict,
+                         {'TEST': {'OBJECT': 'TEST',
+                           'OBJECT_detail': _Text('', 0, ['TEST']),
+                           'VALUE': 7,
+                           'VALUE_detail': _Integer('', 0, ['7']),
+                           'END_OBJECT': 'TEST'},
+                          'END': None,
+                          'objects': ['TEST']})
 
     def test_as_dict(self):
 
