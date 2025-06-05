@@ -11,7 +11,9 @@ def read_label(filepath, chars=4000):
     """Read the PDS3 label from a file. Supports attached labels within binary files.
 
     Parameters:
-        filepath (str, pathlib.Path, or filecache.FCPath): The path to the file.
+        filepath (str, pathlib.Path, or filecache.FCPath): The path to the file. If the
+            file does not contain a PDS3 label, a detached label (with the same path but
+            ending in ".lbl" or ".LBL") is read instead.
         chars (int, optional): Initial number of characters to read from the top of a
             binary file when extracting the label. Reads will continue until the END
             statement is found.
@@ -24,13 +26,13 @@ def read_label(filepath, chars=4000):
         SyntaxError: If the END statement is not found in a binary file.
 
     Notes:
-        If the filepath ends in ".lbl" or ".LBL", it is assumed to refer to a detached
+        If the `filepath` ends in ".lbl" or ".LBL", it is assumed to refer to a detached
         label and the entire file content is returned. Otherwise, it reads the file
         (which may be binary) until it finds an "END" statement.
     """
 
     filepath = FCPath(filepath)
-    if filepath.name[-4:].upper() == '.LBL':
+    if filepath.suffix.upper() == '.LBL':
         return filepath.read_text(encoding='latin-1')
 
     # Define regular expressions for label
@@ -40,10 +42,10 @@ def read_label(filepath, chars=4000):
     _END = re.compile(rb'\n *END *\r?\n')
 
     # Open file for read; treat it as binary
-    with filepath.open(mode='rb') as f:
+    with filepath.open(mode='rb') as f:         # pragma: no branch
         content = b''
         end_of_file = False
-        while not end_of_file:
+        while not end_of_file:                  # pragma: no branch
 
             # Read more content from file
             old_len = len(content)
@@ -75,7 +77,13 @@ def read_label(filepath, chars=4000):
             # If not found, read more content and try again
             chars *= 2
 
-    raise SyntaxError('missing END statement')
+    # Check for a detached .LBL file
+    for suffix in ('.lbl', '.LBL'):
+        alt_filepath = filepath.with_suffix(suffix)
+        if alt_filepath.exists():
+            return read_label(alt_filepath)
+
+    raise SyntaxError(f'missing END statement in {filepath}')
 
 
 def read_vax_binary_label(filepath):
@@ -83,7 +91,12 @@ def read_vax_binary_label(filepath):
     records.
 
     Parameters:
-        filepath (str, pathlib.Path, or filecache.FCPath): The path to the file.
+        filepath (str, pathlib.Path, or filecache.FCPath): The path to the file. A
+            detached label (ending in ".lbl" or ".LBL") is read using "stream" format;
+            any other file is read assuming Vax variable-length format (in which the first
+            two bytes of each record contain the length of the remaining
+            record). If the file does not contain a PDS3 label, a detached label
+            (with same path but ending in ".lbl" or ".LBL") is read instead.
 
     Returns:
         str: The content of the label as a single string with newline terminators.
@@ -93,25 +106,36 @@ def read_vax_binary_label(filepath):
     """
 
     filepath = FCPath(filepath)
-    if filepath.name[-4:].upper() == '.LBL':
-        return filepath.read_text(encoding='latin-1')
+    if filepath.suffix.upper() == '.LBL':
+        return read_label(filepath)
 
+    # Read from Vax-structured file (where first two bytes are the record length)
+    ended = False
     with filepath.open(mode='rb') as f:
         recs = []
         while True:
-            header = f.read(2)
-            if len(header) == 0:
+            header = f.read(2)                   # read two bytes
+            if len(header) == 0:                 # at EOF, break
                 break
-            count = header[1] * 256 + header[0]
-            rec = f.read(count)
-            recs.append(rec)
-            if rec.strip() == b'END':
+            count = header[1] * 256 + header[0]  # interpret bytes as LSB integer
+            rec = f.read(count)                  # read record with this many bytes
+            recs.append(rec)                     # append this record to content
+            if rec.strip() == b'END':            # on "END", we're done
+                ended = True
                 break
-            if len(rec) % 2 == 1:
-                f.read(1)
+            if len(rec) % 2 == 1:                # if the record length is odd...
+                f.read(1)                        # ... skip the next byte
 
-    content = b'\n'.join(recs) + b'\n'
-    return content.decode('latin-1')
+    if ended:
+        content = b'\n'.join(recs) + b'\n'
+        return content.decode('latin-1')
+
+    for suffix in ('.lbl', '.LBL'):
+        alt_filepath = filepath.with_suffix(suffix)
+        if alt_filepath.exists():
+            return read_label(alt_filepath)
+
+    raise SyntaxError(f'missing END statement in {filepath}')
 
 
 def expand_structures(content, fmt_dirs=[], *, repairs=[], label_path=None):

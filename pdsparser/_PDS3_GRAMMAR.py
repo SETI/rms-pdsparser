@@ -252,7 +252,10 @@ class _SimpleTime(_Time):
         self.z = ''
         hour = int(tokens[0])
         minute = int(tokens[1])
-        second = eval(tokens[2]) if len(tokens) > 2 else 0
+        if len(tokens) > 2:
+            second = float(tokens[2]) if '.' in tokens[2] else int(tokens[2])
+        else:
+            second = 0
         self.is_float = isinstance(second, float)
 
         if isinstance(second, int):
