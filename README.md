@@ -104,7 +104,7 @@ This will be the returned dictionary:
      '^IMAGE_offset': 2000,
      '^IMAGE_unit': '<BYTES>',
      '^IMAGE_fmt': '("C3450702_GEOMED.IMG", 2000 <BYTES>)',
-     'INSTRUMENT_HOST_NAME': 'VOYAGER 1',
+     'INSTRUMENT_HOST_NAME_1': 'VOYAGER 1',
      'INSTRUMENT_HOST_NAME_2': 'VG1',
      'IMAGE_TIME': datetime.datetime(1980, 10, 29, 9, 58, 10),
      'IMAGE_TIME_day': -7003,
@@ -142,7 +142,7 @@ As you can see:
 * OBJECTs and GROUPs are converted to sub-dictionaries and are keyed by the value of the
   PDS3 keyword. In this example, `label['VICAR_HEADER']['HEADER_TYPE']` returns "VICAR".
 * If a keyword is repeated at the top level or within an object or group, it receives a
-  suffix `_2`, `_3`, etc. to distinguish it.
+  suffix `_1`, `_2`, `_3`, etc. to distinguish it.
 * If a value has units, there is an additional keyword in the dictionary with `_unit` as
   a suffix, containing the name of the unit.
 * For text values that contain a newline, trailing blanks are suppressed. In addition, a
@@ -170,8 +170,8 @@ As you can see:
 
 Within `TABLE` and `SPREADSHEET` objects, the dictionary keys of the embedded `COLUMN`,
 `BIT_COLUMN`, and `FIELD` objects are keyed by the value of the `NAME` keyword (rather than by
-using repeated keywords `COLUMN`, `COLUMN_2`, `COLUMN_3`, etc.). For example, suppose this
-appears in a PDS3 label:
+using repeated keywords `COLUMN_1`, `COLUMN_2`, `COLUMN_3`, etc.). For example, suppose
+this appears in a PDS3 label:
 
     OBJECT = TABLE
       OBJECT = COLUMN
@@ -212,8 +212,8 @@ address this situation, for every set value, the dictionary also has a key with 
 name but suffix `_list`, which contains the elements of the value as list in their
 original order and including duplicates. In this example, the dictionary contains:
 
-    {'CUTOUT_WINDOW': {1, 200, 800},
-      'CUTOUT_WINDOW_list': [1, 1, 200, 800]}
+    'CUTOUT_WINDOW': {1, 200, 800},
+    'CUTOUT_WINDOW_list': [1, 1, 200, 800]
 
 # Options
 

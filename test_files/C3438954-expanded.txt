@@ -2644,7 +2644,7 @@
   'END_OBJECT_type': 'identifier',
   'END_OBJECT_source': '',
   'objects': ['LINE_SUFFIX_STRUCTURE']},
- 'END': '',
+ 'END': None,
  'objects': ['IMAGE_HISTOGRAM',
   'ENCODING_HISTOGRAM',
   'ENGINEERING_TABLE',

@@ -1,4 +1,6 @@
 PDS_VERSION_ID                  = PDS3
+
+/* A useless comment on a single line */
 ARRAY1 = ( (1, 2, 3, 4, 5,
               6, 7, 8, 9, 10), (11, 12, 13, 14, 15, 16,
             17
@@ -16,8 +18,10 @@ MIXED_SEQ = (1, 2., 3.0 <km>,  'four', "5.", SIX, 'N/A')    /* comment
 ^FIGSET = {"FIG1.GIF", "FIG2.GIF", "FIG3.GIF", "FIG1.GIF", "FIG1.GIF"}
 ^FIGLIST = ("FIG4.GIF", "FIG5.GIF")
 
-TODAY = 2025-05-10
-TODAY = 2025-100
+        /* Another useless comment, this time without a terminator
+
+TODAY = 2025-05-10      /* an in-line comment without a terminator
+TODAY = 2025-100        /* an in-line comment with a terminator */
 TODAY = "2025-05-10"
 TODAY = "2025-100"
 

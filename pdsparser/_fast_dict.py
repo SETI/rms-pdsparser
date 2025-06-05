@@ -27,7 +27,7 @@ def _clean_lines(lines):
     quoted = False
     parens = 0
     braces = 0
-    for recno, line in enumerate(lines):
+    for recno, line in enumerate(lines):        # pragma: no branch
         if not quoted:
             line = line.partition('/*')[0]      # strip trailing comments
         line = line.rstrip()
@@ -57,8 +57,6 @@ def _clean_lines(lines):
         line = line.lstrip()
         if not line:
             continue
-        if line.startswith('/*'):
-            continue
         if line == 'END':
             cleaned.append((recno + 1, 'END'))
             break
@@ -82,8 +80,12 @@ def _clean_lines(lines):
         cleaned.append((recno + 1, prefix + line))
         prefix = ''
 
+    if parens:
+        raise SyntaxError('unbalanced parentheses ()')
+    if braces:
+        raise SyntaxError('unbalanced braces {}')
     if prefix:
-        raise SyntaxError('unbalanced quotes')
+        raise SyntaxError(f'Expected \'"\', found end of text at line {recno+1}')
 
     return cleaned
 
@@ -278,7 +280,7 @@ def _evaluate(value, recno, name):
     return (value, info)
 
 
-def _to_dict(lines, types=False, sources=False):
+def _to_dict(lines, types=False, sources=False, first_suffix=True):
     """The dictionary from a "cleaned" list of records."""
 
     removals = {'quote'}
@@ -287,11 +289,11 @@ def _to_dict(lines, types=False, sources=False):
     if not sources:
         removals.add('source')
 
-    state = [('', '', {})]   # list of (OBJECT or GROUP, name, dict)
+    state = [('', '', {}, set())]   # list of (OBJECT or GROUP, name, dict, dups)
     object_keys = [[]]
     group_keys = [[]]
     statements = []
-    for recno, line in lines:
+    for recno, line in lines:       # pragma: no branch
 
         line = line.strip()
         if line == 'END':
@@ -315,19 +317,18 @@ def _to_dict(lines, types=False, sources=False):
             for suffix, extra_value in info.items():
                 dict_[name + '_' + suffix] = extra_value
 
-            state.append((name, value, dict_))
+            state.append((name, value, dict_, set()))
             object_keys.append([])
             group_keys.append([])
 
         # If this ends an object, add this sub-dictionary to the dictionary
         elif name in {'END_OBJECT', 'END_GROUP'}:
-            if not state:
-                raise ValueError(f'unmatched {name} = {value} at line {recno}')
-
-            (obj_type, obj_name, obj_dict) = state.pop()
+            (obj_type, obj_name, obj_dict, dups) = state.pop()
             if obj_type != name[4:] or (value and value != obj_name):
-                raise SyntaxError(f'unbalanced {obj_type} = {obj_name} at line {recno}')
-
+                if value:
+                    raise SyntaxError(f'unbalanced {name} = {value} at line {recno}')
+                else:
+                    raise SyntaxError(f'unbalanced {name} at line {recno}')
             if not value:       # tolerate END_OBJECT or END_GROUP without name
                 key = name[4:]
                 obj_dict[name] = obj_dict[key]
@@ -340,6 +341,32 @@ def _to_dict(lines, types=False, sources=False):
                 for suffix, extra_value in info.items():
                     obj_dict[name + '_' + suffix] = extra_value
 
+            if first_suffix and dups:
+                # Update the first occurrence of duplicated keys, preserving order
+                translator = {}
+                for dup in dups:
+                    for key in obj_dict:
+                        if not key.startswith(dup):
+                            continue
+                        if key == dup:
+                            translator[key] = key + '_1'
+                            if key in object_keys[-1]:
+                                object_keys[-1][object_keys[-1].index(key)] = key + '_1'
+                            if key in group_keys[-1]:
+                                group_keys[-1][group_keys[-1].index(key)] = key + '_1'
+                            continue
+                        remainder = key[len(dup):]
+                        if not remainder == remainder.lower():
+                            continue
+                        if remainder[1:2].isdigit():
+                            continue
+                        translator[key] = dup + '_1' + remainder
+
+                new_obj_dict = {}
+                for key, value in obj_dict.items():
+                    new_obj_dict[translator.get(key, key)] = value
+                obj_dict = new_obj_dict
+
             objects = object_keys.pop()
             if objects:
                 obj_dict['objects'] = objects
@@ -347,10 +374,12 @@ def _to_dict(lines, types=False, sources=False):
             if groups:
                 obj_dict['groups'] = groups
 
-            dict_ = state[-1][-1]
             if obj_name in {'COLUMN', 'FIELD', 'BIT_COLUMN'} and 'NAME' in obj_dict:
                 obj_name = obj_dict['NAME']
-            key = _unique_key(obj_name, dict_)
+
+            dict_ = state[-1][2]
+            dups = state[-1][3]
+            key = _unique_key(obj_name, dict_, dups)
             dict_[key] = obj_dict
             if name == 'END_OBJECT':
                 object_keys[-1].append(key)
@@ -362,24 +391,25 @@ def _to_dict(lines, types=False, sources=False):
             strval = info['fmt'] if 'fmt' in info else _format(value, info)
             statements[-1] = (name, strval)
 
-            dict_ = state[-1][-1]
-            name = _unique_key(name, dict_)
+            dict_ = state[-1][2]
+            dups = state[-1][3]
+            name = _unique_key(name, dict_, dups)
             dict_[name] = value
             for suffix, extra_value in info.items():
                 dict_[name + '_' + suffix] = extra_value
 
     # Make sure all objects and groups were terminated
-    (obj_type, obj_name, obj_dict) = state.pop()
-    if len(state) > 1:
-        raise SyntaxError(f'unbalanced {obj_type} = {obj_name} at line {recno}')
+    (obj_type, obj_name, obj_dict, dups) = state.pop()
+    if len(state) > 0:
+        raise SyntaxError(f'missing END_{obj_type} = {obj_name}')
 
-    obj_dict['END'] = ''
+    obj_dict['END'] = None
     if object_keys[-1]:
         obj_dict['objects'] = object_keys[-1]
     if group_keys[-1]:
         obj_dict['groups'] = group_keys[-1]
 
-    statements.append(('END', ''))
+    statements.append(('END', None))
     return obj_dict, statements
 
 
@@ -425,7 +455,7 @@ def _format(value, info):
     return str(value)
 
 
-def _fast_dict(content, types=False, sources=False):
+def _fast_dict(content, types=False, sources=False, first_suffix=True):
     """A hierarchical dictionary containing the content of a PDS3 label.
 
     This is _MUCH_ faster than pdsparser.PdsLabel.from_file (about 30x). However it does
@@ -443,6 +473,6 @@ def _fast_dict(content, types=False, sources=False):
 
     lines = content.split('\n')
     cleaned = _clean_lines(lines)
-    return _to_dict(cleaned, types=types, sources=sources)
+    return _to_dict(cleaned, types=types, sources=sources, first_suffix=first_suffix)
 
 ##########################################################################################

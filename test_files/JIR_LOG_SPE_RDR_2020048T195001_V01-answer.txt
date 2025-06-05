@@ -1741,5 +1741,5 @@
    'M_DIFFUSER_CAL_TEMP',
    'M_MOTOR_START_POS',
    'LAMP']},
- 'END': '',
+ 'END': None,
  'objects': ['TABLE']}

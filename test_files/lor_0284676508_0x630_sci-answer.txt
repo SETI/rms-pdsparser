@@ -610,7 +610,7 @@
   'END_OBJECT': 'EXTENSION_CALIB_QUALITY_IMAGE',
   'END_OBJECT_type': 'identifier',
   'END_OBJECT_source': 'EXTENSION_CALIB_QUALITY_IMAGE'},
- 'END': '',
+ 'END': None,
  'objects': ['HEADER',
   'IMAGE',
   'EXTENSION_CALIB_ERROR_EST_HEADER',

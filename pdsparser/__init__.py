@@ -70,7 +70,7 @@ The returned dictionary will be as follows::
      '^IMAGE_offset': 2000,
      '^IMAGE_unit': '<BYTES>',
      '^IMAGE_fmt': '("C3450702_GEOMED.IMG", 2000 <BYTES>)',
-     'INSTRUMENT_HOST_NAME': 'VOYAGER 1',
+     'INSTRUMENT_HOST_NAME_1': 'VOYAGER 1',
      'INSTRUMENT_HOST_NAME_2': 'VG1',
      'IMAGE_TIME': datetime.datetime(1980, 10, 29, 9, 58, 10),
      'IMAGE_TIME_day': -7003,
@@ -109,7 +109,7 @@ As you can see:
 * OBJECTs and GROUPs are converted to sub-dictionaries and are keyed by the value of the
   PDS3 keyword. In this example, `label['VICAR_HEADER']['HEADER_TYPE']` returns 'VICAR'.
 * If a keyword is repeated at the top level or within an object or group, it receives a
-  suffix "_2", "_3", etc. to distinguish it.
+  suffix "_1", "_2", "_3", etc. to distinguish it.
 * If a value has units, there is an additional keyword in the dictionary with "_unit" as
   a suffix, containing the name of the unit.
 * For text values that contain a newline, trailing blanks are suppressed. In addition, a
@@ -139,8 +139,8 @@ Example 2
 
 Within TABLE and SPREADSHEET objects, the dictionary keys of the embedded COLUMN,
 BIT_COLUMN, and FIELD objects are keyed by the value of the NAME keyword (rather than by
-using repeated keywords "COLUMN", "COLUMN_2", "COLUMN_3", etc.). For example, suppose this
-appears in a PDS3 label::
+using repeated keywords "COLUMN_1", "COLUMN_2", "COLUMN_3", etc.). For example, suppose
+this appears in a PDS3 label::
 
     OBJECT = TABLE
       OBJECT = COLUMN
@@ -181,7 +181,10 @@ which is supposed to define the four boundaries of an image region. The user mig
 surprised to learn that in the dictionary, its value is the Python set {1, 200, 800}. To
 address this situation, for every set value, the dictionary also has a key with the same
 name but suffix "_list", which contains the elements of the value as list in their
-original order and including duplicates.
+original order and including duplicates. In this example, the dictionary contains::
+
+    'CUTOUT_WINDOW': {1, 200, 800},
+    'CUTOUT_WINDOW_list': [1, 1, 200, 800]
 
 #######
 Options
@@ -244,7 +247,7 @@ from pyparsing import ParseException
 
 try:
     from ._version import __version__
-except ImportError:
+except ImportError:         # pragma: no cover
     __version__ = 'Version unspecified'
 
 from .utils import read_label, read_vax_binary_label, expand_structures, _unique_key
@@ -259,7 +262,8 @@ class Pds3Label():
     """Class representing the parsed content of a PDS3 label."""
 
     def __init__(self, label, method='strict', *, expand=False, fmt_dirs=[],
-                 repairs=[], vax=False, types=False, sources=False, _details=False):
+                 repairs=[], vax=False, types=False, sources=False, first_suffix=True,
+                 _details=False):
         """Constructor for a Pds3Label.
 
         Parameters:
@@ -287,7 +291,9 @@ class Pds3Label():
                 the content of the associated ".FMT" file.
 
             fmt_dirs (str, pathlib.Path, filecache.FCPath, or list, optional):
-                One or more directory paths to search for ".FMT" files.
+                One or more directory paths to search for ".FMT" files. Note that if
+                `label` indicates a file path, the parent directory of that file is always
+                searched first.
 
             repairs (tuple or list[tuple]):
                 One or more two-element tuples of the form (pattern, replacement), where
@@ -318,6 +324,10 @@ class Pds3Label():
                 the dictionary with the same name but suffix "_source" returning the
                 substring of the label from which this value was derived.
 
+            first_suffix (bool, optional):
+                If True and a keyword is duplicated, append a suffix "_1" to the first
+                occurrence; otherwise, the first occurrence of the keyword has no suffix.
+
             _details (bool, optional):
                 Used for debugging. If True, for each PDS keyword in the label, there will
                 be an extra key in the dictionary with the same name but suffix "_detail"
@@ -339,7 +349,7 @@ class Pds3Label():
         Notes:
             The label information is preserved as a dictionary using the value before
             each equal sign as the key. If a keyword is repeated in the label, later
-            dictionary keys have a suffix "_2", "_3", etc.
+            dictionary keys have a suffix "_1", "_2", "_3", etc.
 
             OBJECT and GROUP elements are described by internal dictionaries, which are
             organized the same as the overall label. The key for COLUMN and FIELD objects
@@ -408,21 +418,24 @@ class Pds3Label():
             else:
                 self.content = read_label(self._filepath)
 
-        # Replace ^STRUCTURE if necessary
-        if expand:
-            self.content = expand_structures(self.content, fmt_dirs=fmt_dirs,
-                                             label_path=self._filepath)
-
         # Repair content if necessary
+        # We need to repair the content before expanding structures in case the repair
+        # applies to the ^STRUCTURE statement (which it does for VG2_SAT.LBL in VG_2001).
         if isinstance(repairs, tuple):
             repairs = [repairs]
         for repair in repairs:
             self.content = re.sub(repair[0], repair[1], self.content)
 
+        # Replace ^STRUCTURE if necessary
+        if expand:
+            self.content = expand_structures(self.content, fmt_dirs=fmt_dirs,
+                                             repairs=repairs, label_path=self._filepath)
+
         # Parse label
         if method == 'fast':
             self.dict, self._statements = _fast_dict(self.content, types=types,
-                                                     sources=sources)
+                                                     sources=sources,
+                                                     first_suffix=first_suffix)
         else:
             try:
                 if method == 'strict':
@@ -435,7 +448,8 @@ class Pds3Label():
                     message = message[2:]
                 raise SyntaxError(message)
 
-            self.dict = self._python_dict(types=types, sources=sources, details=_details)
+            self.dict = self._python_dict(types=types, sources=sources,
+                                          first_suffix=first_suffix, details=_details)
 
     def __str__(self):
 
@@ -466,6 +480,9 @@ class Pds3Label():
     def __getitem__(self, key):
         return self.dict[key]
 
+    def __setitem__(self, key, value):
+        self.dict[key] = value
+
     def __len__(self):
         return len(self.dict)
 
@@ -488,14 +505,14 @@ class Pds3Label():
         """Iterator over this dictionary's values."""
         return self.dict.values()
 
-    def _as_item_dict(self):
+    def _as_item_dict(self, first_suffix=True):
         """A dictionary returning _Item objects, keyed by the label attribute name.
 
         If the item is an OBJECT or GROUP, it returns a sub-dictionary of _Items instead.
         For COLUMN and FIELD objects that have a NAME attribute, the key is that name
         rather than simply "COLUMN" or "FIELD".
 
-        Duplciated keys get assigned suffixes "_2", "_3", etc.
+        Duplciated keys get assigned suffixes "_1", "_2", "_3", etc.
 
         If the value of END_OBJECT or END_GROUP is missing, it is filled in from the
         matching OBJECT or GROUP.
@@ -503,6 +520,7 @@ class Pds3Label():
 
         dict_list = [{}]
         key_list = ['']
+        dup_sets = [set()]
         for statement in self._statements:
             name = statement.name
             item = statement.item
@@ -513,6 +531,7 @@ class Pds3Label():
                 object_dict = {name: item}
                 dict_list.append(object_dict)
                 key_list.append(item.value)
+                dup_sets.append(set())
                 continue
 
             # Replace the key for a COLUMN or FIELD by its NAME value if found
@@ -520,29 +539,48 @@ class Pds3Label():
                 key_list[-1] = item.value
 
             # Make the key unique and add its value to the dictionary
-            key = _unique_key(name, dict_)
+            key = _unique_key(name, dict_, dup_sets[-1])
             dict_[key] = item
             if name not in ('END_OBJECT', 'END_GROUP'):
                 continue
 
-            # Fill in a missing value for END_OBJECT or END_GROUP
+            # Check for END_OBJECT without OBJECT
+            tail = '' if item is None else ' = ' + item.value
+            if name[4:] not in dict_:
+                raise SyntaxError(f'unbalanced {name}{tail}')
+
+            # Get a missing value for END_OBJECT or END_GROUP
             if item is None:
-                dict_[name] = dict_[name[4:]]
+                item = dict_[name[4:]]
+                dict_[name] = item
                 dict_[name + '_source'] = ''    # override because there's no source
 
-            # Pop this dictionary and insert it into the higher-level dictionary
-            if not dict_list:
-                raise SyntaxError('unbalanced END_OBJECT or END_GROUP')
-            object_dict = dict_list.pop()
-            key = _unique_key(key_list.pop(), dict_list[-1])
-            dict_list[-1][key] = object_dict
+            # Check for OBJECT/END_OBJECT mismatch
+            if item.value != dict_[name[4:]].value:
+                raise SyntaxError(f'unbalanced {name}{tail}')
 
-        if len(dict_list) != 1:
-            raise SyntaxError('missing END_OBJECT or END_GROUP')
+            # Pop this dictionary and insert it into the higher-level dictionary
+            dict_ = dict_list.pop()
+            dups = dup_sets.pop()
+            if first_suffix and dups:
+                # Update the first occurrence of duplicated keys, preserving order
+                new_dict = {}
+                for key, value in dict_.items():
+                    if key in dups:
+                        key = key + '_1'
+                    new_dict[key] = value
+                dict_ = new_dict
+
+            key = _unique_key(key_list.pop(), dict_list[-1], dup_sets[-1])
+            dict_list[-1][key] = dict_
+
+        if len(dict_list) > 1:
+            name = list(dict_list[-1].keys())[0]    # dicts preserve key order
+            raise SyntaxError(f'missing END_{name}')
 
         return dict_list[0]
 
-    def _python_dict(self, types=False, sources=False, details=False):
+    def _python_dict(self, types=False, sources=False, first_suffix=True, details=False):
         """The label content as a Python dictionary.
 
         Keys are the attribute names (with numeric suffix for duplicates).
@@ -587,7 +625,7 @@ class Pds3Label():
             if group_keys:
                 dict_['groups'] = group_keys
 
-            # When there's no associated object, the "_source" key provided initem_dict
+            # When there's no associated object, the "_source" key provided in item_dict
             # contains the override source value. Used for END_OBJECT with no value.
             for key, value in item_dict.items():
                 if key.endswith('_source'):     # there's no source object
@@ -598,7 +636,7 @@ class Pds3Label():
 
             return dict_
 
-        item_dict = self._as_item_dict()
+        item_dict = self._as_item_dict(first_suffix=first_suffix)
         return from_item_dict(item_dict)
 
     # Old, deprecated API
