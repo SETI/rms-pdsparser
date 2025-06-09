@@ -271,8 +271,10 @@ class Pds3Label():
                 The label, defined as a path to a file or as the content of a label. The
                 content can be represented by a single string with <LF> or <CR><LF>
                 terminators, or as a list of strings with optional terminators. If the
-                file contains an attached PDS3 label, the label is read up to the END
-                statement and the remainder is ignored.
+                file contains an attached PDS3 label, that file is read up to the END
+                statement and the remainder is ignored. If the file does not contain a
+                label but a detached label (ending in ".lbl" or ".LBL" exists), that file
+                is read instead.
 
             method (str, optional):
                 The method of parsing to apply to the label. One of:
@@ -334,14 +336,6 @@ class Pds3Label():
                 returning an object (of class internal to this module) containing details
                 about how the entry was parsed. Not provided if `fast=True`.
 
-        Attributes:
-            content (str): The full content of the label as a string with <LF> line
-                separators. If expand is True, this will be the expanded content, with any
-                ^STRUCTURE values replaced.
-            dict (dict): The actual dictionary containing all the label content. However,
-                note that most of the Python dictionary API is implemented directly by
-                this class, so label[keyword] is the same as label.dict[keyword].
-
         Raises:
             FileNotFoundError: If the label file is missing.
             SyntaxError: If the label content contains invalid syntax.
@@ -388,6 +382,15 @@ class Pds3Label():
             returns the filename only; Append "_offset" to the key to get the offset and
             "_unit" to get the unit, which is either "<BYTES>" or an empty string
             (meaning the unit is records).
+
+        Attributes:
+            content (str): The full content of the label as a string with <LF> line
+                separators. If expand is True, this will be the expanded content, with any
+                ^STRUCTURE values replaced.
+            dict (dict): The actual dictionary containing all the label content. However,
+                note that most of the Python dictionary API is implemented directly by
+                this class, so label[keyword] is the same as label.dict[keyword].
+
         """
 
         if method not in {'strict', 'loose', 'fast'}:

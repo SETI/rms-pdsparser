@@ -242,6 +242,18 @@ class Test_SimpleTime(unittest.TestCase):
         _pass(self, _HmsTime, '"12:34:56.12345678"', dt.time(12, 34, 56, 123457),
               strval='12:34:56.123457')
 
+        # Make sure leading zeros work
+        obj = _pass(self, _HmsTime, '"12:34:01"', dt.time(12, 34, 1))
+        self.assertIsInstance(obj.sec, int)
+
+        obj = _pass(self, _HmsTime, '"12:34:01."', dt.time(12, 34, 1))
+        self.assertIsInstance(obj.sec, float)
+
+        obj = _pass(self, _HmsTime, '"01:01"', dt.time(1, 1, 0))
+        self.assertIsInstance(obj.sec, int)
+
+        _pass(self, _HmsTime, '"01:01:01"', dt.time(1, 1, 1))
+
         _fail(self, _HmsTime, '2:34')
         _fail(self, _HmsTime, '12:3')
         _fail(self, _HmsTime, '123:34')
