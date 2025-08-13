@@ -1,5 +1,5 @@
-``pdstemplate`` Module
-======================
+``pdsparser`` Module
+====================
 
 .. automodule:: pdsparser
     :member-order: bysource

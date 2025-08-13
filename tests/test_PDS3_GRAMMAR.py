@@ -54,8 +54,8 @@ def _pass(testcase, type_, string, value, strval=None, vtype=None, test=3, super
         if not grammars:
             raise ValueError(f'no grammar selected: {cls}, test={test}')
 
-        # print('_pass', repr(string), cls, len(grammars))
-        for grammar in grammars:
+        for k, grammar in enumerate(grammars):
+            # print('_pass', repr(string), cls, len(grammars), k)
             try:
                 obj = (grammar + StringEnd()).parse_string(string)[0]
             except ParseException:
@@ -97,8 +97,8 @@ def _fail(testcase, type_, string, test=3, super_=True):
         if not grammars:
             raise ValueError(f'no grammar selected: {cls}, test={test}')
 
-        # print('_fail', repr(string), cls, len(grammars))
-        for grammar in grammars:
+        for k, grammar in enumerate(grammars):
+            # print('_fail', repr(string), cls, len(grammars), k)
             testcase.assertRaises(ParseException, (grammar + StringEnd()).parse_string,
                                   string)
 

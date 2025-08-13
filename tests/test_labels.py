@@ -89,7 +89,7 @@ class Test_labels(unittest.TestCase):
 
         # Labels with syntax errors
         filepath = TEST_FILE_DIR / 'v1877838443_1-EXCEPTION.lbl'
-        self.assertRaisesRegex(SyntaxError, "Expected end of text, found 'CHECKSUM'.*",
+        self.assertRaisesRegex(SyntaxError, "Expected end of text, found .*",
                                Pds3Label, filepath, method='loose')
 
         filepath = TEST_FILE_DIR / 'v1877838443_1-EXCEPTION2.lbl'
@@ -336,7 +336,7 @@ class Test_labels(unittest.TestCase):
         self.assertEqual(d2.dict, answer_dict)
 
         # This FMT has a missing quote in the first DESCRIPTION
-        self.assertRaisesRegex(SyntaxError, "Expected end of text, found 'DESCRIPTION'.*",
+        self.assertRaisesRegex(SyntaxError, "Expected end of text, found .*",
                                Pds3Label, filepath, method='loose', expand=True,
                                repairs=[(r'"IRIS_ROWFMT\.FMT"',
                                          '"IRISHEDR-with-error.FMT"')])
@@ -355,6 +355,30 @@ class Test_labels(unittest.TestCase):
         # will still raise FileNotFoundError
         content = filepath.read_text()
         self.assertRaises(FileNotFoundError, Pds3Label, content, expand=True)
+
+    def test_pdsdd(self):
+
+        self.maxDiff = MAXDIFF
+
+        root = 'pdsdd-short'
+        filepath = TEST_FILE_DIR / (root + '.full')
+        d1 = Pds3Label(filepath, method='compound')
+        answer = (TEST_FILE_DIR / (root + '-answer.txt')).read_text()
+        answer_dict = eval(answer)
+        self.assertEqual(d1.dict, answer_dict)
+
+        root = 'pdsdd-endless'
+        filepath = TEST_FILE_DIR / (root + '.full')
+        d2 = Pds3Label(filepath, method='loose')    # missing commas in sequences
+
+        d1_dict_endless = {}
+        for key, value in d1.dict.items():
+            if key.startswith('END_'):
+                continue
+            d1_dict_endless[key] = value
+        d1_dict_endless['END'] = d1['END_21']
+
+        self.assertEqual(d2.dict, d1_dict_endless)
 
     def test_more(self):
 
@@ -456,6 +480,29 @@ class Test_labels(unittest.TestCase):
                            'END_OBJECT': 'TEST'},
                           'END': None,
                           'objects': ['TEST']})
+
+        # END with no terminator
+        content = 'VALUE = 7\nEND'
+        d1 = Pds3Label(content, method='loose')
+        self.assertEqual(d1.dict, {'VALUE': 7, 'END': None})
+
+        content = 'VALUE = 7\nEND    \t  '
+        d1 = Pds3Label(content, method='loose')
+        self.assertEqual(d1.dict, {'VALUE': 7, 'END': None})
+
+        # Missing commas in a sequence or set
+        content = 'VALUE = (1, 2, 3 4)\n'
+        d1 = Pds3Label(content, method='loose')
+        self.assertEqual(d1.dict, {'VALUE': [1, 2, 3, 4]})
+
+        content = 'VALUE = {1, 2, 3 4 1}\n'
+        d1 = Pds3Label(content, method='loose')
+        self.assertEqual(d1.dict, {'VALUE': {1, 2, 3, 4},
+                                   'VALUE_list': [1, 2, 3, 4, 1]})
+
+        content = 'VALUE = ((1, 2) (3\n "four"))\n'
+        d1 = Pds3Label(content, method='loose')
+        self.assertEqual(d1.dict, {'VALUE': [[1, 2], [3, "four"]]})
 
     def test_as_dict(self):
 

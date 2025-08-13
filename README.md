@@ -43,12 +43,12 @@ pip install rms-pdsparser
 
 The typical way to use this is as follows:
 
-    from pdsparser import PdsLabel
-    label = PdsLabel(label_path)
+    from pdsparser import Pds3Label
+    label = Pds3Label(label_path)
 
 where `label_path` is the path to a PDS3 label file or a data file containing an attached
 PDS3 label. The returned object `label` is an object of class
-`PdsLabel`[![image](https://raw.githubusercontent.com/SETI/rms-pdsparser/main/icons/link.png)](https://rms-pdsparser.readthedocs.io/en/latest/module.html#__init__.PdsParser),
+`PdsL3abel`[![image](https://raw.githubusercontent.com/SETI/rms-pdsparser/main/icons/link.png)](https://rms-pdsparser.readthedocs.io/en/latest/module.html#pdsparser.Pds3Label),
 which supports the Python dictionary API and provides access to the content of the label.
 
 # Example 1
@@ -169,9 +169,9 @@ As you can see:
 # Example 2
 
 Within `TABLE` and `SPREADSHEET` objects, the dictionary keys of the embedded `COLUMN`,
-`BIT_COLUMN`, and `FIELD` objects are keyed by the value of the `NAME` keyword (rather than by
-using repeated keywords `COLUMN_1`, `COLUMN_2`, `COLUMN_3`, etc.). For example, suppose
-this appears in a PDS3 label:
+`BIT_COLUMN`, `FIELD`, and `ELEMENT_DEFINITION` objects are keyed by the value of the
+`NAME` keyword (rather than by using repeated keywords `COLUMN_1`, `COLUMN_2`, `COLUMN_3`,
+etc.). For example, suppose this appears in a PDS3 label:
 
     OBJECT = TABLE
       OBJECT = COLUMN
@@ -187,15 +187,15 @@ this appears in a PDS3 label:
 The returned section of the dictionary will look like this:
 
     {'TABLE': {'OBJECT': 'TABLE',
-                'VOLUME_ID': {'OBJECT': 'COLUMN',
-                              'NAME': 'VOLUME_ID',
-                              'START_BYTE': 1,
-                              'END_OBJECT': 'COLUMN'},
-                'FILE_SPECIFICATION_NAME': {'OBJECT': 'COLUMN',
-                                            'NAME': 'FILE_SPECIFICATION_NAME',
-                                            'START_BYTE': 15,
-                                            'END_OBJECT': 'COLUMN'},
-                'END_OBJECT': 'TABLE'},
+               'VOLUME_ID': {'OBJECT': 'COLUMN',
+                             'NAME': 'VOLUME_ID',
+                             'START_BYTE': 1,
+                             'END_OBJECT': 'COLUMN'},
+               'FILE_SPECIFICATION_NAME': {'OBJECT': 'COLUMN',
+                                           'NAME': 'FILE_SPECIFICATION_NAME',
+                                           'START_BYTE': 15,
+                                           'END_OBJECT': 'COLUMN'},
+               'END_OBJECT': 'TABLE'},
     }
 
 # Example 3
@@ -218,7 +218,7 @@ original order and including duplicates. In this example, the dictionary contain
 # Options
 
 The
-`PdsLabel`[![image](https://raw.githubusercontent.com/SETI/rms-pdsparser/main/icons/link.png)](https://rms-pdsparser.readthedocs.io/en/latest/module.html#__init__.PdsParser.__init__),
+`Pds3Label`[![image](https://raw.githubusercontent.com/SETI/rms-pdsparser/main/icons/link.png)](https://rms-pdsparser.readthedocs.io/en/latest/module.html#pdsparser.Pds3Label),
 constructor provides a variety of additional options for how to
 parse the label and present its content.
 
@@ -235,7 +235,7 @@ parse the label and present its content.
 * Use the `repairs` option to correct any known syntax errors in the label prior to
   parsing using regular expressions.
 
-Three methods of parsing the label are provided.
+Four methods of parsing the label are provided.
 
 * `method="strict"` uses a strict implementation of the PDS3 syntax. It is sure to provide
   accurate results, but can be rather slow. This method can also be used to validate the
@@ -247,24 +247,28 @@ Three methods of parsing the label are provided.
   * It allows the value of `END_OBJECT` and `END_GROUP` to be absent, as long as they are
     still properly paired with associated `OBJECT` and `GROUP` keywords.
   * It allows time zone expressions (where were disallowed after the PDS2 standard).
+  * Commas can be missing between the elements of a sequence or set.
+  * The final line terminator after `END` can be missing from a detached label.
 
 * `method="fast"` is a different and much faster (often 30x faster) parser, which takes
   various "shortcuts" during the parsing. As a result, it may fail on occasions where the
   other methods succeed, and it may not return correct results in the cases of some
   oddly-formatted labels. However, it handles all the most common aspects of the PDS3
   syntax correctly, and so may be a good choice when handling large numbers of labels.
+* `method="compound"`" is similar to "loose", but it parses a "compound" label, i.e., one
+  that might contain more than one `END` statement.
 
 # Utilities
 
 The `pdsparser` module provides several additional utilities for handling PDS3 labels.
 
-- `read_label`[![image](https://raw.githubusercontent.com/SETI/rms-pdsparser/main/icons/link.png)](https://rms-pdsparser.readthedocs.io/en/latest/module.html#_utils.read_label):
+- `read_label`[![image](https://raw.githubusercontent.com/SETI/rms-pdsparser/main/icons/link.png)](https://rms-pdsparser.readthedocs.io/en/latest/module.html#pdsparser.utils.read_label):
   Reads a PDS3 label from a file. Supports attached labels
   within binary files.
-- `read_vax_binary_label`[![image](https://raw.githubusercontent.com/SETI/rms-pdsparser/main/icons/link.png)](https://rms-pdsparser.readthedocs.io/en/latest/module.html#_utils.read_vax_binary_label):
+- `read_vax_binary_label`[![image](https://raw.githubusercontent.com/SETI/rms-pdsparser/main/icons/link.png)](https://rms-pdsparser.readthedocs.io/en/latest/module.html#pdsparser.utils.read_vax_binary_label):
   Reads the attached PDS3 label from an old-style
   Vax binary file that uses variable-length records.
-- `expand_structures`[![image](https://raw.githubusercontent.com/SETI/rms-pdsparser/main/icons/link.png)](https://rms-pdsparser.readthedocs.io/en/latest/module.html#_utils.expand_structures):
+- `expand_structures`[![image](https://raw.githubusercontent.com/SETI/rms-pdsparser/main/icons/link.png)](https://rms-pdsparser.readthedocs.io/en/latest/module.html#pdsparser.utils.expand_structures):
   Replaces any `^STRUCTURE` keywords in a label string
   with the content of the associated ".FMT" files.
 

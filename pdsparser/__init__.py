@@ -138,9 +138,9 @@ Example 2
 #########
 
 Within TABLE and SPREADSHEET objects, the dictionary keys of the embedded COLUMN,
-BIT_COLUMN, and FIELD objects are keyed by the value of the NAME keyword (rather than by
-using repeated keywords "COLUMN_1", "COLUMN_2", "COLUMN_3", etc.). For example, suppose
-this appears in a PDS3 label::
+BIT_COLUMN, FIELD, and ELEMENT_DEFINITION objects are keyed by the value of the NAME
+keyword (rather than by using repeated keywords "COLUMN_1", "COLUMN_2", "COLUMN_3", etc.).
+For example, suppose this appears in a PDS3 label::
 
     OBJECT = TABLE
       OBJECT = COLUMN
@@ -206,7 +206,7 @@ parse the label and present its content.
 * Use the `repairs` to correct any known syntax errors in the label prior to parsing using
   regular expressions.
 
-Three methods of parsing the label are provided.
+Four methods of parsing the label are provided.
 
 * `method="strict"` uses a strict implementation of the PDS3 syntax. It is sure to provide
   accurate results, but can be rather slow. This method can also be used to validate the
@@ -218,12 +218,16 @@ Three methods of parsing the label are provided.
   * It allows the value of `END_OBJECT` and `END_GROUP` to be absent, as long as they are
     still properly paired with associated `OBJECT` and `GROUP` keywords.
   * It allows time zone expressions (where were disallowed after the PDS2 standard).
+  * Commas can be missing between the elements of a sequence or set.
+  * The final line terminator after `END` can be missing from a detached label.
 
 * `method="fast"` is a different and much faster (often 30x faster) parser, which takes
   various "shortcuts" during the parsing. As a result, it may fail on occasions where the
   other methods succeed, and it may not return correct results in the cases of some
   oddly-formatted labels. However, it handles all the most common aspects of the PDS3
   syntax correctly, and so may be a good choice when handling large numbers of labels.
+* `method="compound"`" is similar to "loose", but it parses a "compound" label, i.e., one
+  that might  contain more than one `END` statement.
 
 #########
 Utilities
@@ -231,11 +235,11 @@ Utilities
 
 The `pdsparser` module provides several additional utilities for handling PDS3 labels.
 
-- :meth:`_utils.read_label`: Reads a PDS3 label from a file. Supports attached labels
+- :meth:`~utils.read_label`: Reads a PDS3 label from a file. Supports attached labels
   within binary files.
-- :meth:`_utils.read_vax_binary_label`: Reads the attached PDS3 label from an old-style
+- :meth:`~utils.read_vax_binary_label`: Reads the attached PDS3 label from an old-style
   Vax binary file that uses variable-length records.
-- :meth:`_utils.expand_structures`: Replaces any `^STRUCTURE` keywords in a label string
+- :meth:`~utils.expand_structures`: Replaces any `^STRUCTURE` keywords in a label string
   with the content of the associated ".FMT" files.
 """
 
@@ -252,7 +256,9 @@ except ImportError:         # pragma: no cover
 
 from .utils import read_label, read_vax_binary_label, expand_structures, _unique_key
 from ._fast_dict import _fast_dict
-from ._PDS3_GRAMMAR import _PDS3_LABEL, _ALT_PDS3_LABEL
+from ._PDS3_GRAMMAR import _PDS3_LABEL, _ALT_PDS3_LABEL, _COMPOUND_LABEL
+
+_PARSERS = {'strict': _PDS3_LABEL, 'loose': _ALT_PDS3_LABEL, 'compound': _COMPOUND_LABEL}
 
 ##########################################################################################
 # Pds3Label
@@ -283,6 +289,9 @@ class Pds3Label():
                   to the full PDS3 standard.
                 * "loose" is similar to the above, but tolerates some common syntax
                   errors.
+                * "compound" is similar to "loose", but it parses a "compound" label,
+                  i.e., one that might contain more than one "END" statement. This option
+                  is not supported for attached labels.
                 * "fast": uses s a different parser, which executes ~ 30x fast than the
                   above and handles all the most common aspects of the PDS3 standard.
                   However, it is not guaranteed to provide an accurate parsing under all
@@ -346,9 +355,9 @@ class Pds3Label():
             dictionary keys have a suffix "_1", "_2", "_3", etc.
 
             OBJECT and GROUP elements are described by internal dictionaries, which are
-            organized the same as the overall label. The key for COLUMN and FIELD objects
-            is their NAME attribute; for others, it is the value after the equal sign in
-            the OBJECT or GROUP statement.
+            organized the same as the overall label. The key for COLUMN, BIT_COLUMN,
+            FIELD, and ELEMENT_DEFINITION objects is their NAME attribute; for others, it
+            is the value after the equal sign in the OBJECT or GROUP statement.
 
             Numeric values are represented as ints or floats. If the value has a unit, the
             unit value can be accessed by appending "_unit" to the key. Integers given
@@ -390,10 +399,9 @@ class Pds3Label():
             dict (dict): The actual dictionary containing all the label content. However,
                 note that most of the Python dictionary API is implemented directly by
                 this class, so label[keyword] is the same as label.dict[keyword].
-
         """
 
-        if method not in {'strict', 'loose', 'fast'}:
+        if method not in {'strict', 'loose', 'compound', 'fast'}:
             raise ValueError('invalid method: ' + repr(method))
 
         self._filepath = ''
@@ -418,6 +426,8 @@ class Pds3Label():
         if self._filepath:
             if vax:
                 self.content = read_vax_binary_label(self._filepath)
+            elif method == 'compound':
+                self.content = FCPath(self._filepath).read_text(encoding='latin-1')
             else:
                 self.content = read_label(self._filepath)
 
@@ -441,10 +451,7 @@ class Pds3Label():
                                                      first_suffix=first_suffix)
         else:
             try:
-                if method == 'strict':
-                    self._statements = _PDS3_LABEL.parse_string(self.content)
-                else:
-                    self._statements = _ALT_PDS3_LABEL.parse_string(self.content)
+                self._statements = _PARSERS[method].parse_string(self.content)
             except ParseException as err:       # convert parse exception to SyntaxError
                 message = str(err)
                 if message[:2] == ', ':
@@ -512,14 +519,26 @@ class Pds3Label():
         """A dictionary returning _Item objects, keyed by the label attribute name.
 
         If the item is an OBJECT or GROUP, it returns a sub-dictionary of _Items instead.
-        For COLUMN and FIELD objects that have a NAME attribute, the key is that name
-        rather than simply "COLUMN" or "FIELD".
+        For COLUMN, FIELD, BIT_COLUMN, and ELEMENT_DEFINITION objects that have a NAME
+        attribute, the key is that name rather than the object type.
 
-        Duplciated keys get assigned suffixes "_1", "_2", "_3", etc.
+        Duplicated keys get assigned suffixes "_1", "_2", "_3", etc.
 
         If the value of END_OBJECT or END_GROUP is missing, it is filled in from the
         matching OBJECT or GROUP.
         """
+
+        def apply_first_suffix(dict_, dups):
+            if first_suffix and dups:
+                # Update the first occurrence of duplicated keys, preserving order
+                new_dict = {}
+                for key, value in dict_.items():
+                    if key in dups:
+                        key = key + '_1'
+                    new_dict[key] = value
+                return new_dict
+
+            return dict_
 
         dict_list = [{}]
         key_list = ['']
@@ -538,7 +557,9 @@ class Pds3Label():
                 continue
 
             # Replace the key for a COLUMN or FIELD by its NAME value if found
-            if key_list[-1] in {'COLUMN', 'FIELD', 'BIT_COLUMN'} and name == 'NAME':
+            if key_list[-1] in {'COLUMN', 'FIELD', 'BIT_COLUMN', 'ELEMENT_DEFINITION',
+                                'GENERIC_OBJECT_DEFINITION',
+                                'SPECIFIC_OBJECT_DEFINITION'} and name == 'NAME':
                 key_list[-1] = item.value
 
             # Make the key unique and add its value to the dictionary
@@ -565,14 +586,7 @@ class Pds3Label():
             # Pop this dictionary and insert it into the higher-level dictionary
             dict_ = dict_list.pop()
             dups = dup_sets.pop()
-            if first_suffix and dups:
-                # Update the first occurrence of duplicated keys, preserving order
-                new_dict = {}
-                for key, value in dict_.items():
-                    if key in dups:
-                        key = key + '_1'
-                    new_dict[key] = value
-                dict_ = new_dict
+            dict_ = apply_first_suffix(dict_, dups)
 
             key = _unique_key(key_list.pop(), dict_list[-1], dup_sets[-1])
             dict_list[-1][key] = dict_
@@ -581,7 +595,7 @@ class Pds3Label():
             name = list(dict_list[-1].keys())[0]    # dicts preserve key order
             raise SyntaxError(f'missing END_{name}')
 
-        return dict_list[0]
+        return apply_first_suffix(dict_list[0], dup_sets[0])
 
     def _python_dict(self, types=False, sources=False, first_suffix=True, details=False):
         """The label content as a Python dictionary.
