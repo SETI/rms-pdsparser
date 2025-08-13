@@ -1,4 +1,4 @@
-``pdstemplate`` Module
+``pdsparser`` Module
 ======================
 
 .. automodule:: pdsparser

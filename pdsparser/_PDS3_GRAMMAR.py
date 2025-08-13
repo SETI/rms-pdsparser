@@ -1056,9 +1056,13 @@ _ALT_STATEMENT.set_parse_action(_Statement)
 _END_STATEMENT = _WHITE + Literal('END') + _EOL
 _END_STATEMENT.set_name('_END_STATEMENT')
 
+_ALT_END_STATEMENT = _WHITE + Literal('END') + _WHITE + Optional(_EOL)
+_ALT_END_STATEMENT.set_name('_ALT_END_STATEMENT')
+
 class _EndStatement(_Item):
 
     grammar = _END_STATEMENT
+    alt_grammar = _ALT_END_STATEMENT
 
     def __init__(self, s, loc, tokens):
         self.tokens = tokens
@@ -1070,9 +1074,13 @@ class _EndStatement(_Item):
         return 'END'
 
 _END_STATEMENT.set_parse_action(_EndStatement)
+_ALT_END_STATEMENT.set_parse_action(_EndStatement)
 
-_PDS3_LABEL = _WHITE + OneOrMore(_STATEMENT) + _END_STATEMENT + _WHITE + StringEnd()
-_ALT_PDS3_LABEL = (_WHITE + OneOrMore(_ALT_STATEMENT) + Optional(_END_STATEMENT)
-                   + _WHITE + StringEnd())
+_PDS3_LABEL = (Optional(_EOL) + OneOrMore(_STATEMENT) + _END_STATEMENT + _WHITE
+               + StringEnd())
+_ALT_PDS3_LABEL = (Optional(_EOL) + OneOrMore(_ALT_STATEMENT)
+                   + Optional(_ALT_END_STATEMENT) + Optional(_EOL) + StringEnd())
+_COMPOUND_LABEL = (Optional(_EOL) + OneOrMore(_ALT_STATEMENT | _END_STATEMENT)
+                   + Optional(_ALT_END_STATEMENT)) + StringEnd()
 
 ##########################################################################################

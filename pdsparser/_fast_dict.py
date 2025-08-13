@@ -283,6 +283,36 @@ def _evaluate(value, recno, name):
 def _to_dict(lines, types=False, sources=False, first_suffix=True):
     """The dictionary from a "cleaned" list of records."""
 
+    def fix_first_suffix(obj_dict, dups):
+
+        if first_suffix and dups:
+            # Update the first occurrence of duplicated keys, preserving order
+            translator = {}
+            for dup in dups:
+                for key in obj_dict:
+                    if not key.startswith(dup):
+                        continue
+                    if key == dup:
+                        translator[key] = key + '_1'
+                        if key in object_keys[-1]:
+                            object_keys[-1][object_keys[-1].index(key)] = key + '_1'
+                        if key in group_keys[-1]:
+                            group_keys[-1][group_keys[-1].index(key)] = key + '_1'
+                        continue
+                    remainder = key[len(dup):]
+                    if not remainder == remainder.lower():
+                        continue
+                    if remainder[1:2].isdigit():
+                        continue
+                    translator[key] = dup + '_1' + remainder
+
+            new_obj_dict = {}
+            for key, value in obj_dict.items():
+                new_obj_dict[translator.get(key, key)] = value
+            return new_obj_dict
+
+        return obj_dict
+
     removals = {'quote'}
     if not types:
         removals.add('type')
@@ -341,31 +371,7 @@ def _to_dict(lines, types=False, sources=False, first_suffix=True):
                 for suffix, extra_value in info.items():
                     obj_dict[name + '_' + suffix] = extra_value
 
-            if first_suffix and dups:
-                # Update the first occurrence of duplicated keys, preserving order
-                translator = {}
-                for dup in dups:
-                    for key in obj_dict:
-                        if not key.startswith(dup):
-                            continue
-                        if key == dup:
-                            translator[key] = key + '_1'
-                            if key in object_keys[-1]:
-                                object_keys[-1][object_keys[-1].index(key)] = key + '_1'
-                            if key in group_keys[-1]:
-                                group_keys[-1][group_keys[-1].index(key)] = key + '_1'
-                            continue
-                        remainder = key[len(dup):]
-                        if not remainder == remainder.lower():
-                            continue
-                        if remainder[1:2].isdigit():
-                            continue
-                        translator[key] = dup + '_1' + remainder
-
-                new_obj_dict = {}
-                for key, value in obj_dict.items():
-                    new_obj_dict[translator.get(key, key)] = value
-                obj_dict = new_obj_dict
+            obj_dict = fix_first_suffix(obj_dict, dups)
 
             objects = object_keys.pop()
             if objects:
@@ -374,7 +380,9 @@ def _to_dict(lines, types=False, sources=False, first_suffix=True):
             if groups:
                 obj_dict['groups'] = groups
 
-            if obj_name in {'COLUMN', 'FIELD', 'BIT_COLUMN'} and 'NAME' in obj_dict:
+            if (obj_name in {'COLUMN', 'FIELD', 'BIT_COLUMN', 'ELEMENT_DEFINITION',
+                             'GENERIC_OBJECT_DEFINITION', 'SPECIFIC_OBJECT_DEFINITION'}
+                    and 'NAME' in obj_dict):
                 obj_name = obj_dict['NAME']
 
             dict_ = state[-1][2]
@@ -408,6 +416,8 @@ def _to_dict(lines, types=False, sources=False, first_suffix=True):
         obj_dict['objects'] = object_keys[-1]
     if group_keys[-1]:
         obj_dict['groups'] = group_keys[-1]
+
+    obj_dict = fix_first_suffix(obj_dict, dups)
 
     statements.append(('END', None))
     return obj_dict, statements

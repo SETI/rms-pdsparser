@@ -7,7 +7,7 @@ import re
 from filecache import FCPath
 
 
-def read_label(filepath, chars=4000):
+def read_label(filepath, *, chars=4000):
     """Read the PDS3 label from a file. Supports attached labels within binary files.
 
     Parameters:
