@@ -1,5 +1,5 @@
 ``pdsparser`` Module
-======================
+====================
 
 .. automodule:: pdsparser
     :member-order: bysource
