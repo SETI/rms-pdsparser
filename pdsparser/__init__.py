@@ -218,6 +218,8 @@ Four methods of parsing the label are provided.
   * It allows the value of `END_OBJECT` and `END_GROUP` to be absent, as long as they are
     still properly paired with associated `OBJECT` and `GROUP` keywords.
   * It allows time zone expressions (where were disallowed after the PDS2 standard).
+  * Commas can be missing between the elements of a sequence or set.
+  * The final line terminator after `END` can be missing from a detached label.
 
 * `method="fast"` is a different and much faster (often 30x faster) parser, which takes
   various "shortcuts" during the parsing. As a result, it may fail on occasions where the
@@ -288,7 +290,8 @@ class Pds3Label():
                 * "loose" is similar to the above, but tolerates some common syntax
                   errors.
                 * "compound" is similar to "loose", but it parses a "compound" label,
-                  i.e., one that might  contain more than one "END" statement.
+                  i.e., one that might contain more than one "END" statement. This option
+                  is not supported for attached labels.
                 * "fast": uses s a different parser, which executes ~ 30x fast than the
                   above and handles all the most common aspects of the PDS3 standard.
                   However, it is not guaranteed to provide an accurate parsing under all

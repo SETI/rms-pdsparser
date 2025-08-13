@@ -490,6 +490,20 @@ class Test_labels(unittest.TestCase):
         d1 = Pds3Label(content, method='loose')
         self.assertEqual(d1.dict, {'VALUE': 7, 'END': None})
 
+        # Missing commas in a sequence or set
+        content = 'VALUE = (1, 2, 3 4)\n'
+        d1 = Pds3Label(content, method='loose')
+        self.assertEqual(d1.dict, {'VALUE': [1, 2, 3, 4]})
+
+        content = 'VALUE = {1, 2, 3 4 1}\n'
+        d1 = Pds3Label(content, method='loose')
+        self.assertEqual(d1.dict, {'VALUE': {1, 2, 3, 4},
+                                   'VALUE_list': [1, 2, 3, 4, 1]})
+
+        content = 'VALUE = ((1, 2) (3\n "four"))\n'
+        d1 = Pds3Label(content, method='loose')
+        self.assertEqual(d1.dict, {'VALUE': [[1, 2], [3, "four"]]})
+
     def test_as_dict(self):
 
         self.maxDiff = MAXDIFF

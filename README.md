@@ -247,6 +247,8 @@ Four methods of parsing the label are provided.
   * It allows the value of `END_OBJECT` and `END_GROUP` to be absent, as long as they are
     still properly paired with associated `OBJECT` and `GROUP` keywords.
   * It allows time zone expressions (where were disallowed after the PDS2 standard).
+  * Commas can be missing between the elements of a sequence or set.
+  * The final line terminator after `END` can be missing from a detached label.
 
 * `method="fast"` is a different and much faster (often 30x faster) parser, which takes
   various "shortcuts" during the parsing. As a result, it may fail on occasions where the

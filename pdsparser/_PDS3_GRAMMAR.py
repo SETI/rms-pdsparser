@@ -622,7 +622,7 @@ _SET = _EMPTY_SET | _NON_EMPTY_SET
 _SET.set_name('_SET')
 
 _ALT_NON_EMPTY_SET = (Suppress('{') + _SKIP + _ALT_SCALAR + _SKIP
-                      + ZeroOrMore(Suppress(',') + _SKIP + _ALT_SCALAR + _SKIP)
+                      + ZeroOrMore(Suppress(Optional(',')) + _SKIP + _ALT_SCALAR + _SKIP)
                       + Suppress('}'))
 _ALT_SET = _EMPTY_SET | _ALT_NON_EMPTY_SET
 _ALT_SET.set_name('_ALT_SET')
@@ -674,7 +674,7 @@ _SEQUENCE = (Suppress('(') + _SKIP + _SCALAR + _SKIP
 _SEQUENCE.set_name('_SEQUENCE')
 
 _ALT_SEQUENCE = (Suppress('(') + _SKIP + _ALT_SCALAR + _SKIP
-                 + ZeroOrMore(Suppress(',') + _SKIP + _ALT_SCALAR + _SKIP)
+                 + ZeroOrMore(Suppress(Optional(',')) + _SKIP + _ALT_SCALAR + _SKIP)
                  + Suppress(')'))
 _ALT_SEQUENCE.set_name('_ALT_SEQUENCE')
 
@@ -1081,6 +1081,6 @@ _PDS3_LABEL = (Optional(_EOL) + OneOrMore(_STATEMENT) + _END_STATEMENT + _WHITE
 _ALT_PDS3_LABEL = (Optional(_EOL) + OneOrMore(_ALT_STATEMENT)
                    + Optional(_ALT_END_STATEMENT) + Optional(_EOL) + StringEnd())
 _COMPOUND_LABEL = (Optional(_EOL) + OneOrMore(_ALT_STATEMENT | _END_STATEMENT)
-                   + Optional(_ALT_END_STATEMENT)) + StringEnd()
+                   + Optional(_ALT_END_STATEMENT) + StringEnd())
 
 ##########################################################################################
