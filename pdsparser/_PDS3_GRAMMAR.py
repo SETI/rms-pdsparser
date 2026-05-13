@@ -384,7 +384,7 @@ _ALT_TIME_ZONE.set_parse_action(_TimeZone)
 # _ZonedTime
 ##########################################################################################
 _ZONED_TIME0 = _HMS_TIME0 + _TIME_ZONE
-_ALT_ZONED_TIME0 = _ALT_HMS_TIME0 + _ALT_TIME_ZONE
+_ALT_ZONED_TIME0 = _ALT_HMS_TIME0_SHORT + _ALT_TIME_ZONE
 
 class _ZonedTime(_Time):
     """A time of day with a time zone."""

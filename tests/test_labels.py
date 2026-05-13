@@ -548,6 +548,21 @@ class Test_labels(unittest.TestCase):
                                 self.assertEqual(d1.dict, d2.dict)
                                 self.assertEqual(d1.dict['DATE_fmt'], dt2)
 
+        method = 'loose'
+        for q in ('', '"'):
+            for tz in ('-2', '+ 3', '-4: 0', '+05: 0'):
+               for hms in (' 2:34:56', ' 2: 3: 4', '12:34: 5.67'):
+                    time1 = f'{hms}{tz}'
+                    time2 = time1.replace(' ', '0')
+                    d1 = Pds3Label(f'TIME = {q}{time1}{q}\n', method=method)
+                    d2 = Pds3Label(f'TIME = {q}{time2}{q}\n', method=method)
+                    self.assertEqual(d1.dict, d2.dict)
+
+                    dt1 = '2012-01-23T' + time1
+                    dt2 = '2012-01-23T' + time2
+                    d1 = Pds3Label(f'DATE = {q}{dt1}{q}\n', method=method)
+                    d2 = Pds3Label(f'DATE = {q}{dt2}{q}\n', method=method)
+                    self.assertEqual(d1.dict, d2.dict)
 
     def test_as_dict(self):
 
