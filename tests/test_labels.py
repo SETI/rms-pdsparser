@@ -474,10 +474,10 @@ class Test_labels(unittest.TestCase):
         d1 = Pds3Label(content, method='loose', _details=True)
         self.assertEqual(d1.dict,
                          {'TEST': {'OBJECT': 'TEST',
-                           'OBJECT_detail': _Text('', 0, ['TEST']),
-                           'VALUE': 7,
-                           'VALUE_detail': _Integer('', 0, ['7']),
-                           'END_OBJECT': 'TEST'},
+                                   'OBJECT_detail': _Text('', 0, ['TEST']),
+                                   'VALUE': 7,
+                                   'VALUE_detail': _Integer('', 0, ['7']),
+                                   'END_OBJECT': 'TEST'},
                           'END': None,
                           'objects': ['TEST']})
 
@@ -551,7 +551,7 @@ class Test_labels(unittest.TestCase):
         method = 'loose'
         for q in ('', '"'):
             for tz in ('-2', '+ 3', '-4: 0', '+05: 0'):
-               for hms in (' 2:34:56', ' 2: 3: 4', '12:34: 5.67'):
+                for hms in (' 2:34:56', ' 2: 3: 4', '12:34: 5.67'):
                     time1 = f'{hms}{tz}'
                     time2 = time1.replace(' ', '0')
                     d1 = Pds3Label(f'TIME = {q}{time1}{q}\n', method=method)

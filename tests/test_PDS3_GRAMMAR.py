@@ -273,11 +273,11 @@ class Test_SimpleTime(unittest.TestCase):
                     strval='12:34:06.123456', test=2, super_=False)
         self.assertEqual(obj.type_, 'utc_time')
 
-        obj = _pass(self, _HmsTime, ' 2:34', dt.time( 2, 34), '02:34:00', test=2,
+        obj = _pass(self, _HmsTime, ' 2:34', dt.time(2, 34), '02:34:00', test=2,
                     super_=False)
         self.assertEqual(obj.type_, 'local_time')
 
-        obj = _pass(self, _UtcTime, ' 2:34Z', dt.time( 2, 34), '02:34:00', test=2,
+        obj = _pass(self, _UtcTime, ' 2:34Z', dt.time(2, 34), '02:34:00', test=2,
                     super_=False)
         self.assertEqual(obj.type_, 'utc_time')
 
@@ -289,7 +289,7 @@ class Test_SimpleTime(unittest.TestCase):
                     super_=False)
         self.assertEqual(obj.type_, 'utc_time')
 
-        _pass(self, _HmsTime, '" 2:34:56"', dt.time( 2, 34, 56), test=2, super_=False)
+        _pass(self, _HmsTime, '" 2:34:56"', dt.time(2, 34, 56), test=2, super_=False)
         _pass(self, _HmsTime, '"12: 4:56"', dt.time(12,  4, 56), test=2, super_=False)
         _pass(self, _HmsTime, '"12:34: 6"', dt.time(12, 34,  6), test=2, super_=False)
         _pass(self, _HmsTime, '"12:34: 6.5"', dt.time(12, 34,  6, 500000),
@@ -417,12 +417,12 @@ class Test_Time(unittest.TestCase):
         _fail(self, _Time, '12:34 +2:30', test=1)
         _fail(self, _Time, '12:34 +02:30', test=1)
 
-        _pass(self, _Time, ' 2:34:56', dt.time( 2, 34, 56), '02:34:56', test=2)
+        _pass(self, _Time, ' 2:34:56', dt.time(2, 34, 56), '02:34:56', test=2)
         _pass(self, _Time, '12: 4:56', dt.time(12,  4, 56), '12:04:56', test=2)
         _pass(self, _Time, '12:34: 6', dt.time(12, 34,  6), '12:34:06', test=2)
-        _pass(self, _Time, ' 2: 4: 6Z', dt.time( 2,  4,  6), '02:04:06', test=2)
+        _pass(self, _Time, ' 2: 4: 6Z', dt.time(2,  4,  6), '02:04:06', test=2)
 
-        _pass(self, _Time, ' 2:34:56.123456', dt.time( 2, 34, 56, 123456),
+        _pass(self, _Time, ' 2:34:56.123456', dt.time(2, 34, 56, 123456),
               '02:34:56.123456', test=2)
         _pass(self, _Time, '12: 4:56.123456', dt.time(12,  4, 56, 123456),
               '12:04:56.123456', test=2)
