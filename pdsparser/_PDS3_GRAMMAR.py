@@ -322,13 +322,11 @@ _UTC_TIME = _UTC_TIME0 | (Suppress('"') + _UTC_TIME0 + Suppress('"'))
 _UTC_TIME.set_name('_UTC_TIME')
 _UtcTime.grammar = _UTC_TIME
 
-_ALT_HMS_TIME = (_ALT_HMS_TIME0 | _ALT_HMS_TIME0_SHORT
-                 | (Suppress('"') + _ALT_HMS_TIME0 + Suppress('"')))
+_ALT_HMS_TIME = _ALT_HMS_TIME0_SHORT | (Suppress('"') + _ALT_HMS_TIME0 + Suppress('"'))
 _ALT_HMS_TIME.set_name('_ALT_HMS_TIME')
 _HmsTime.alt_grammar = _ALT_HMS_TIME
 
-_ALT_UTC_TIME = (_ALT_UTC_TIME0 | _ALT_UTC_TIME0_SHORT
-                 | (Suppress('"') + _ALT_UTC_TIME0 + Suppress('"')))
+_ALT_UTC_TIME = _ALT_UTC_TIME0_SHORT | (Suppress('"') + _ALT_UTC_TIME0 + Suppress('"'))
 _ALT_UTC_TIME.set_name('_ALT_UTC_TIME')
 _UtcTime.alt_grammar = _ALT_UTC_TIME
 
@@ -384,7 +382,8 @@ _ALT_TIME_ZONE.set_parse_action(_TimeZone)
 # _ZonedTime
 ##########################################################################################
 _ZONED_TIME0 = _HMS_TIME0 + _TIME_ZONE
-_ALT_ZONED_TIME0 = _ALT_HMS_TIME0_SHORT + _ALT_TIME_ZONE
+_ALT_ZONED_TIME0 = _ALT_HMS_TIME0 + _ALT_TIME_ZONE
+_ALT_ZONED_TIME0_SHORT = _ALT_HMS_TIME0_SHORT + _ALT_TIME_ZONE
 
 class _ZonedTime(_Time):
     """A time of day with a time zone."""
@@ -411,12 +410,14 @@ class _ZonedTime(_Time):
 
 _ZONED_TIME0.set_parse_action(_ZonedTime)
 _ALT_ZONED_TIME0.set_parse_action(_ZonedTime)
+_ALT_ZONED_TIME0_SHORT.set_parse_action(_ZonedTime)
 
 _ZONED_TIME = _ZONED_TIME0 | (Suppress('"') + _ZONED_TIME0 + Suppress('"'))
 _ZONED_TIME.set_name('_ZONED_TIME')
 _ZonedTime.grammar = _ZONED_TIME
 
-_ALT_ZONED_TIME = _ALT_ZONED_TIME0 | (Suppress('"') + _ALT_ZONED_TIME0 + Suppress('"'))
+_ALT_ZONED_TIME = (_ALT_ZONED_TIME0_SHORT
+                   | (Suppress('"') + _ALT_ZONED_TIME0 + Suppress('"')))
 _ALT_ZONED_TIME.set_name('_ALT_ZONED_TIME')
 _ZonedTime.alt_grammar = _ALT_ZONED_TIME
 
