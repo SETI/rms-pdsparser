@@ -11,9 +11,12 @@ from .utils import _based_int, _is_identifier, _format_float, _unique_key, _unwr
 
 _UNITS = re.compile(r' *(<.*?>)')
 _BASED_INT = re.compile(r'(\d+)#(\w+)#')
-_DATE = re.compile(r'"?(\d\d\d\d-\d\d(?:\d|-\d\d))"?')
-_TIME = re.compile(r'"?(\d\d:\d\d(?:|\:\d\d(?:|.\d*))Z?)"?')
-_DATE_TIME = re.compile(r'"?(\d\d\d\d-\d\d(?:\d|-\d\d)T\d\d:\d\d(?:|\:\d\d(|.\d*))Z?)"?')
+
+_DATE_REGEX = r'\d\d\d\d-(?:\d\d\d| \d\d|  \d|[ 01]\d-[ 0123]\d)'
+_TIME_REGEX = r'[ \d]?\d:[ \d]\d(?:|\:[ \d]\d(?:|.\d*))Z?'
+_DATE = re.compile(rf'"?({_DATE_REGEX})"?')
+_TIME = re.compile(rf'"?({_TIME_REGEX})"?')
+_DATE_TIME = re.compile(rf'"?({_DATE_REGEX}T{_TIME_REGEX})"?')
 
 
 def _clean_lines(lines):
@@ -102,7 +105,7 @@ def _evaluate(value, recno, name):
     is_pointer = name.startswith('^')
 
     if match := _DATE_TIME.fullmatch(source):
-        day, sec = julian.day_sec_from_iso(match.group(1))
+        day, sec = julian.day_sec_from_iso(match.group(1).replace(' ', '0'))
         order = 'YDT' if len(value.split('-')) == 2 else 'YMDT'
         hour, minute, second = julian.hms_from_sec(sec)
         isec = int(second // 1.)
@@ -119,7 +122,7 @@ def _evaluate(value, recno, name):
         return (value, info)
 
     if match := _DATE.fullmatch(source):
-        day = julian.day_from_iso(match.group(1))
+        day = julian.day_from_iso(match.group(1).replace(' ', '0'))
         order = 'YD' if len(value.split('-')) == 2 else 'YMD'
         value = dt.date(*julian.ymd_from_day(day))
         info['day'] = day
@@ -129,7 +132,10 @@ def _evaluate(value, recno, name):
         return (value, info)
 
     if match := _TIME.fullmatch(source):
-        sec = julian.sec_from_iso(match.group(1).rstrip('Z'))
+        text = match.group(1).rstrip('Z').replace(' ', '0')
+        if text[1] == ':':
+            text = '0' + text
+        sec = julian.sec_from_iso(text)
         info['sec'] = sec
         hour, minute, second = julian.hms_from_sec(sec)
         isec = int(second // 1.)

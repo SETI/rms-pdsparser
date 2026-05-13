@@ -504,6 +504,51 @@ class Test_labels(unittest.TestCase):
         d1 = Pds3Label(content, method='loose')
         self.assertEqual(d1.dict, {'VALUE': [[1, 2], [3, "four"]]})
 
+        # Times with embedded blanks where zeros belong
+        for method in ('fast', 'loose'):
+            for q in ('', '"'):
+                for date1 in ('2001- 2- 3', '2004-05- 6', '2007- 8-09',
+                              '2010-  3', '2014- 56'):
+                    date2 = date1.replace(' ', '0')
+                    d1 = Pds3Label(f'DATE = {q}{date1}{q}\n', method=method)
+                    d2 = Pds3Label(f'DATE = {q}{date2}{q}\n', method=method)
+                    self.assertEqual(d1.dict, d2.dict)
+                    self.assertEqual(d1.dict['DATE_fmt'], date2)
+
+                    for hh in (' 6', '07'):
+                        for mm in ('08', ' 9'):
+                            time1 = f'{hh}:{mm}'
+                            time2 = time1.replace(' ', '0')
+                            if time2[1] == ':':
+                                time2 = '0' + time2
+                            d1 = Pds3Label(f'TIME = {q}{time1}{q}\n', method=method)
+                            d2 = Pds3Label(f'TIME = {q}{time2}{q}\n', method=method)
+                            self.assertEqual(d1.dict, d2.dict)
+                            self.assertEqual(d1.dict['TIME_fmt'], time2 + ':00')
+
+                            dt1 = date1 + 'T' + time1
+                            dt2 = date2 + 'T' + time2
+                            d1 = Pds3Label(f'DATE = {q}{dt1}{q}\n', method=method)
+                            d2 = Pds3Label(f'DATE = {q}{dt2}{q}\n', method=method)
+                            self.assertEqual(d1.dict, d2.dict)
+                            self.assertEqual(d1.dict['DATE_fmt'], dt2 + ':00')
+
+                            for ss in (' 1', '02', ' 5.678'):
+                                time1 = f'{hh}:{mm}:{ss}'
+                                time2 = time1.replace(' ', '0')
+                                d1 = Pds3Label(f'TIME = {q}{time1}{q}\n', method=method)
+                                d2 = Pds3Label(f'TIME = {q}{time2}{q}\n', method=method)
+                                self.assertEqual(d1.dict, d2.dict)
+                                self.assertEqual(d1.dict['TIME_fmt'], time2)
+
+                                dt1 = date1 + 'T' + time1
+                                dt2 = date2 + 'T' + time2
+                                d1 = Pds3Label(f'DATE = {q}{dt1}{q}\n', method=method)
+                                d2 = Pds3Label(f'DATE = {q}{dt2}{q}\n', method=method)
+                                self.assertEqual(d1.dict, d2.dict)
+                                self.assertEqual(d1.dict['DATE_fmt'], dt2)
+
+
     def test_as_dict(self):
 
         self.maxDiff = MAXDIFF

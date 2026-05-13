@@ -246,7 +246,10 @@ Four methods of parsing the label are provided.
   * It allows slashes in file names and in text strings that are not quoted (e.g., `N/A`).
   * It allows the value of `END_OBJECT` and `END_GROUP` to be absent, as long as they are
     still properly paired with associated `OBJECT` and `GROUP` keywords.
-  * It allows time zone expressions (where were disallowed after the PDS2 standard).
+  * It allows time zone expressions, which were disallowed starting in Version 4 of the
+    standards.
+  * It allows blanks where leading zeros belong in dates and times, e.g., "`2026- 7 - 4`"
+    instead of "`2026-07-04`" and "`12: 3: 4`" instead of "`12:03:04`".
   * Commas can be missing between the elements of a sequence or set.
   * The final line terminator after `END` can be missing from a detached label.
 
