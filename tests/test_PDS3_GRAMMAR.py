@@ -254,7 +254,8 @@ class Test_SimpleTime(unittest.TestCase):
 
         _pass(self, _HmsTime, '"01:01:01"', dt.time(1, 1, 1))
 
-        _fail(self, _HmsTime, '2:34')
+        _fail(self, _HmsTime, '2:34', test=1)
+        _pass(self, _HmsTime, '2:34', dt.time(2, 34), '02:34:00', test=2, super_=False)
         _fail(self, _HmsTime, '12:3')
         _fail(self, _HmsTime, '123:34')
         _fail(self, _HmsTime, '123 :34')
@@ -263,31 +264,66 @@ class Test_SimpleTime(unittest.TestCase):
         _fail(self, _UtcTime, '12:34', super_=False)
         _fail(self, _UtcTime, '12:34 Z')
 
+        # Blanks in place of zeros
+        obj = _pass(self, _UtcTime, '12: 4:56Z', dt.time(12,  4, 56), '12:04:56', test=2,
+                    super_=False)
+        self.assertEqual(obj.type_, 'utc_time')
+
+        obj = _pass(self, _UtcTime, '12:34: 6.123456Z', dt.time(12, 34, 6, 123456),
+                    strval='12:34:06.123456', test=2, super_=False)
+        self.assertEqual(obj.type_, 'utc_time')
+
+        obj = _pass(self, _HmsTime, ' 2:34', dt.time(2, 34), '02:34:00', test=2,
+                    super_=False)
+        self.assertEqual(obj.type_, 'local_time')
+
+        obj = _pass(self, _UtcTime, ' 2:34Z', dt.time(2, 34), '02:34:00', test=2,
+                    super_=False)
+        self.assertEqual(obj.type_, 'utc_time')
+
+        obj = _pass(self, _HmsTime, '12: 4', dt.time(12,  4), '12:04:00', test=2,
+                    super_=False)
+        self.assertEqual(obj.type_, 'local_time')
+
+        obj = _pass(self, _UtcTime, '12: 4Z', dt.time(12, 4), '12:04:00', test=2,
+                    super_=False)
+        self.assertEqual(obj.type_, 'utc_time')
+
+        _pass(self, _HmsTime, '" 2:34:56"', dt.time(2, 34, 56), test=2, super_=False)
+        _pass(self, _HmsTime, '"12: 4:56"', dt.time(12,  4, 56), test=2, super_=False)
+        _pass(self, _HmsTime, '"12:34: 6"', dt.time(12, 34,  6), test=2, super_=False)
+        _pass(self, _HmsTime, '"12:34: 6.5"', dt.time(12, 34,  6, 500000),
+              strval='12:34:06.500', test=2, super_=False)
+
 
 class Test_TimeZone(unittest.TestCase):
 
     def runTest(self):
 
-        _pass(self, _TimeZone, '+2:30', tz(2*60 + 30), '+02:30', dt.timezone)
-        _pass(self, _TimeZone, '+0:30', tz(30), '+00:30')
-        _pass(self, _TimeZone, '-0:30', tz(-30), '-00:30')
+        _pass(self, _TimeZone, '+02:30', tz(2*60 + 30), '+02:30', dt.timezone)
         _pass(self, _TimeZone, '+00:30', tz(30), '+00:30')
         _pass(self, _TimeZone, '-00:30', tz(-30), '-00:30')
-        _pass(self, _TimeZone, '-0', tz(0), '+00:00')
-        _pass(self, _TimeZone, '-00', tz(0), '+00:00')
-        _pass(self, _TimeZone, '-1', tz(-60), '-01:00')
-        _pass(self, _TimeZone, '-01', tz(-60), '-01:00')
-        _pass(self, _TimeZone, '+0', tz(0))
-        _pass(self, _TimeZone, '+00', tz(0))
-        _pass(self, _TimeZone, '+1', tz(60))
-        _pass(self, _TimeZone, '+01', tz(60))
-        _pass(self, _TimeZone, '+23:59', tz(23*60 + 59), '+23:59')
-        _pass(self, _TimeZone, '-23:59', tz(-23*60 - 59), '-23:59')
+        _pass(self, _TimeZone, '+00:30', tz(30), '+00:30')
+        _pass(self, _TimeZone, '-00:30', tz(-30), '-00:30')
+        _pass(self, _TimeZone, '+14:45', tz(14*60 + 45), '+14:45')
+        _pass(self, _TimeZone, '-12:45', tz(-12*60 - 45), '-12:45')
+        _pass(self, _TimeZone, '-00', tz(0), '+00')
+        _pass(self, _TimeZone, '+00', tz(0), '+00')
+        _pass(self, _TimeZone, '-01', tz(-60), '-01')
+        _pass(self, _TimeZone, '+01', tz(60), '+01')
+        _pass(self, _TimeZone, '-1:15', tz(-75), '-01:15')
+        _pass(self, _TimeZone, '-0', tz(0), '+00')
+        _pass(self, _TimeZone, '-1', tz(-60), '-01')
+        _pass(self, _TimeZone, '+0', tz(0), '+00')
+        _pass(self, _TimeZone, '+1', tz(60), '+01')
 
         _fail(self, _TimeZone, '0:30')
         _fail(self, _TimeZone, '-000')
         _fail(self, _TimeZone, ' -0:30')
-        _fail(self, _TimeZone, '- 0:30')
+        _fail(self, _TimeZone, '- 0:30', test=1)
+        _pass(self, _TimeZone, '- 0:30', tz(-30), '-00:30', test=2)
+        _fail(self, _TimeZone, '-01: 0', test=1)
+        _pass(self, _TimeZone, '-01: 0', tz(-60), '-01:00', test=2)
         _fail(self, _TimeZone, '-0 :30')
         _fail(self, _TimeZone, '-0: 30')
         _fail(self, _TimeZone, '-24')
@@ -301,16 +337,16 @@ class Test_ZonedTime(unittest.TestCase):
     def runTest(self):
 
         obj = _pass(self, _ZonedTime, '12:34+2', dt.time(12, 34, tzinfo=tz(2*60)),
-                    '12:34:00+02:00', dt.time, test=2, super_=False)
+                    '12:34:00+02', super_=False)
         self.assertEqual(obj.type_, 'zoned_time')
         self.assertEqual(obj.sec, 3600*12 + 34*60 - 3600*2)
-        self.assertEqual(obj.fmt, '12:34:00+02:00')
-        self.assertEqual(str(obj), '12:34:00+02:00')
-        self.assertEqual(repr(obj), '_ZonedTime(12:34:00+02:00)')
+        self.assertEqual(obj.fmt, '12:34:00+02')
+        self.assertEqual(str(obj), '12:34:00+02')
+        self.assertEqual(repr(obj), '_ZonedTime(12:34:00+02)')
         self.assertEqual(obj.source, '12:34+2')
 
         obj = _pass(self, _ZonedTime, '12:34+2:30', dt.time(12, 34, tzinfo=tz(2*60 + 30)),
-                    '12:34:00+02:30', dt.time, test=2, super_=False)
+                    '12:34:00+02:30', super_=False)
         self.assertEqual(obj.type_, 'zoned_time')
         self.assertEqual(obj.sec, 3600*12 + 34*60 - 3600*2 - 30*60)
         self.assertEqual(obj.fmt, '12:34:00+02:30')
@@ -319,14 +355,16 @@ class Test_ZonedTime(unittest.TestCase):
         self.assertEqual(obj.source, '12:34+2:30')
 
         _pass(self, _ZonedTime, '"12:34-02"', dt.time(12, 34, tzinfo=tz(-2*60)),
-              '12:34:00-02:00', dt.time, test=2, super_=False)
+              '12:34:00-02', super_=False)
         _pass(self, _ZonedTime, '"12:34-02:45"', dt.time(12, 34, tzinfo=tz(-2*60 - 45)),
-              '12:34:00-02:45', dt.time, test=2, super_=False)
+              '12:34:00-02:45', super_=False)
 
-        _fail(self, _ZonedTime, '12:34 +2:30',)
-        _fail(self, _ZonedTime, '12:34 +02:30',)
-        _fail(self, _ZonedTime, '12:34 -2',)
-        _fail(self, _ZonedTime, '12:34- 2',)
+        _fail(self, _ZonedTime, '12:34 +2:30')
+        _fail(self, _ZonedTime, '12:34 +02:30')
+        _fail(self, _ZonedTime, '12:34 -2')
+        _fail(self, _ZonedTime, '12:34- 2', test=1)
+        _pass(self, _ZonedTime, '12:34- 2', dt.time(12, 34, tzinfo=tz(-2*60)),
+              '12:34:00-02', test=2)
 
 
 class Test_Time(unittest.TestCase):
@@ -379,6 +417,18 @@ class Test_Time(unittest.TestCase):
         _fail(self, _Time, '12:34 +2:30', test=1)
         _fail(self, _Time, '12:34 +02:30', test=1)
 
+        _pass(self, _Time, ' 2:34:56', dt.time(2, 34, 56), '02:34:56', test=2)
+        _pass(self, _Time, '12: 4:56', dt.time(12,  4, 56), '12:04:56', test=2)
+        _pass(self, _Time, '12:34: 6', dt.time(12, 34,  6), '12:34:06', test=2)
+        _pass(self, _Time, ' 2: 4: 6Z', dt.time(2,  4,  6), '02:04:06', test=2)
+
+        _pass(self, _Time, ' 2:34:56.123456', dt.time(2, 34, 56, 123456),
+              '02:34:56.123456', test=2)
+        _pass(self, _Time, '12: 4:56.123456', dt.time(12,  4, 56, 123456),
+              '12:04:56.123456', test=2)
+        _pass(self, _Time, '12:34: 6.123456', dt.time(12, 34,  6, 123456),
+              '12:34:06.123456', test=2)
+
 
 class Test_Date(unittest.TestCase):
 
@@ -398,12 +448,20 @@ class Test_Date(unittest.TestCase):
 
         _pass(self, _Date, '2000-12-01', dt.date(2000, 12, 1))
         _pass(self, _Date, '2000-12-31', dt.date(2000, 12, 31))
+        _pass(self, _Date, '2000-366', dt.date(2000, 12, 31))
 
         _fail(self, _Date, '3000-01-01')
         _fail(self, _Date, '2000-00-01')
         _fail(self, _Date, '2000-13-01')
         _fail(self, _Date, '2000-01-00')
         _fail(self, _Date, '2000-01-32')
+
+        _fail(self, _Date, '2000- 1-01', test=1)
+        _fail(self, _Date, '2000-01- 1', test=1)
+        _pass(self, _Date, '2000- 1-01', dt.date(2000, 1, 1), '2000-01-01', test=2,
+              super_=False)
+        _pass(self, _Date, '2000-01- 1', dt.date(2000, 1, 1), '2000-01-01', test=2,
+              super_=False)
 
 
 class Test_DateTime(unittest.TestCase):
@@ -425,24 +483,32 @@ class Test_DateTime(unittest.TestCase):
         self.assertEqual(str(obj), '2000-003T12:34:00')
         self.assertEqual(repr(obj), '_DateTime(2000-003T12:34:00)')
 
-        obj = _pass(self, _DateTime, '2000-01-01T01:23+4', dt.datetime(2000, 1, 1, 1, 23,
-                                                                       tzinfo=tz(4*60)),
-                    '2000-01-01T01:23:00+04:00', test=2)
+        obj = _pass(self, _DateTime, '2000-01-01T01:23+4',
+                    dt.datetime(2000, 1, 1, 1, 23, tzinfo=tz(4*60)),
+                    '2000-01-01T01:23:00+04', test=2)
         self.assertEqual(obj.day, -1)
         self.assertEqual(obj.sec, 60 * (23 + 60) - 4 * 3600 + 86400)
-        self.assertEqual(str(obj), '2000-01-01T01:23:00+04:00')
-        self.assertEqual(repr(obj), '_DateTime(2000-01-01T01:23:00+04:00)')
+        self.assertEqual(str(obj), '2000-01-01T01:23:00+04')
+        self.assertEqual(repr(obj), '_DateTime(2000-01-01T01:23:00+04)')
+
+        obj = _pass(self, _DateTime, '2000-01-01T23:46-4: 0',
+                    dt.datetime(2000, 1, 1, 23, 46, tzinfo=tz(-4*60)),
+                    '2000-01-01T23:46:00-04:00', test=2)
+        self.assertEqual(obj.day, 1)
+        self.assertEqual(obj.sec, 60 * (46 + 60 * 23) - 20 * 3600)
 
         _pass(self, _DateTime, '2000-01-01T12:34Z', dt.datetime(2000, 1, 1, 12, 34),
               '2000-01-01T12:34:00')
         _pass(self, _DateTime, '2000-01-01T12:34:56Z',
               dt.datetime(2000, 1, 1, 12, 34, 56), '2000-01-01T12:34:56')
-        _pass(self, _DateTime, '2000-01-01T01:23+4', dt.datetime(2000, 1, 1, 1, 23,
-                                                                 tzinfo=tz(4*60)),
-              '2000-01-01T01:23:00+04:00', test=2)
-        _pass(self, _DateTime, '2000-01-01T12:34:56+7:08',
-              dt.datetime(2000, 1, 1, 12, 34, 56, tzinfo=tz(7*60+8)),
-              '2000-01-01T12:34:56+07:08', test=2)
+        _fail(self, _DateTime, '2000-01-01T01:23+4', test=1)
+        _pass(self, _DateTime, '2000-01-01T01:23+4',
+              dt.datetime(2000, 1, 1, 1, 23, tzinfo=tz(4*60)),
+              '2000-01-01T01:23:00+04', test=2)
+        _fail(self, _DateTime, '2000-01-01T12:34:56+7:15', test=1)
+        _pass(self, _DateTime, '2000-01-01T12:34:56+7:15',
+              dt.datetime(2000, 1, 1, 12, 34, 56, tzinfo=tz(7*60+15)),
+              '2000-01-01T12:34:56+07:15', test=2)
 
         _pass(self, _DateTime, '2004-366T04:38:16.12345678Z',
               dt.datetime(2004, 12, 31, 4, 38, 16, 123457),
@@ -453,7 +519,40 @@ class Test_DateTime(unittest.TestCase):
         _fail(self, _DateTime, '2000-01-01T12:34 Z')
 
         _fail(self, _DateTime, '2000-01-01T01:23+4', test=1)
-        _fail(self, _DateTime, '2000-01-01T12:34:56+7:08', test=1)
+        _pass(self, _DateTime, '2000-01-01T01:23+4',
+              dt.datetime(2000, 1, 1, 1, 23, tzinfo=tz(4*60)),
+              '2000-01-01T01:23:00+04', test=2)
+        _fail(self, _DateTime, '2000-01-01T12:34:56+7:15', test=1)
+        _pass(self, _DateTime, '2000-01-01T12:34:56+7:15',
+              dt.datetime(2000, 1, 1, 12, 34, 56, tzinfo=tz(7*60+15)),
+              strval='2000-01-01T12:34:56+07:15', test=2)
+        _fail(self, _DateTime, '2000-01-01T12:34:56+07:08')
+
+        _fail(self, _DateTime, '2000- 1-01T12:34', test=1)
+        _fail(self, _DateTime, '2000-01- 1T12:34', test=1)
+        _fail(self, _DateTime, '2000-01- 2T12:34Z', test=1)
+        _fail(self, _DateTime, '2000-01-01T 1:23+4', test=1)
+        _fail(self, _DateTime, '2000-01-01T12: 4:56+7:15', test=1)
+        _fail(self, _DateTime, '2000-01-01T12:34: 6+07:08', test=1)
+
+        _pass(self, _DateTime, '2004- 1-22T12:34',
+              dt.datetime(2004,  1, 22, 12, 34), '2004-01-22T12:34:00', test=2)
+        _pass(self, _DateTime, '2004-11- 2T12:34',
+              dt.datetime(2004, 11,  2, 12, 34), '2004-11-02T12:34:00', test=2)
+        _pass(self, _DateTime, '2004-11-22T 2:34Z',
+              dt.datetime(2004, 11, 22,  2, 34), '2004-11-22T02:34:00', test=2)
+        _pass(self, _DateTime, '2004-11-22T12:04',
+              dt.datetime(2004, 11, 22, 12,  4), '2004-11-22T12:04:00', test=2)
+        _pass(self, _DateTime, '2004-11-22T12:34: 6Z',
+              dt.datetime(2004, 11, 22, 12, 34, 6), '2004-11-22T12:34:06', test=2)
+        _pass(self, _DateTime, '2004-11-22T12:34:56+7',
+              dt.datetime(2004, 11, 22, 12, 34, 56, tzinfo=tz(7*60)),
+              '2004-11-22T12:34:56+07', test=2)
+        _pass(self, _DateTime, '2004-11-22T12:34:56+07: 0',
+              dt.datetime(2004, 11, 22, 12, 34, 56, tzinfo=tz(7*60)),
+              '2004-11-22T12:34:56+07:00', test=2)
+        _pass(self, _DateTime, '2004-11-22T12:34: 6Z',
+              dt.datetime(2004, 11, 22, 12, 34, 6), '2004-11-22T12:34:06', test=2)
 
 
 class Test_Text(unittest.TestCase):

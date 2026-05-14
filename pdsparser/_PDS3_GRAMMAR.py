@@ -230,17 +230,22 @@ _ZERO_59 = Word('012345', nums, exact=2)
 _HMS_TIME0 = (_ZERO_23 + Suppress(':') + _ZERO_59
               + Optional(Suppress(':')
                          + Combine(_ZERO_59 + Optional('.' + Optional(_UNSIGNED_INT)))))
-_HMS_TIME1 = _HMS_TIME0.copy()
-_HMS_TIME = _HMS_TIME0 | (Suppress('"') + _HMS_TIME0 + Suppress('"'))
-_HMS_TIME.set_name('_HMS_TIME')
+_UTC_TIME0 = _HMS_TIME0.copy() + Suppress(Literal('Z'))
 
-_UTC_TIME0 = (_ZERO_23 + Suppress(':') + _ZERO_59
-              + Optional(Suppress(':')
-                         + Combine(_ZERO_59 + Optional('.' + Optional(_UNSIGNED_INT))))
-              + Suppress(Literal('Z')))
-_UTC_TIME1 = _UTC_TIME0.copy()
-_UTC_TIME = _UTC_TIME0 | (Suppress('"') + _UTC_TIME0 + Suppress('"'))
-_UTC_TIME.set_name('_UTC_TIME')
+_ALT_ZERO_23 = Word(' 01', nums, exact=2) | Word('2', '0123', exact=2)
+_ALT_ZERO_23_SHORT = _ALT_ZERO_23 | Word(nums, exact=1)
+# ^ The "_SHORT" version is needed for a standalone time; disallowed for a date-time.
+_ALT_ZERO_59 = Word(' 012345', nums, exact=2)
+_ALT_HMS_TIME0 = (_ALT_ZERO_23 + Suppress(':') + _ALT_ZERO_59
+                  + Optional(Suppress(':')
+                             + Combine(_ALT_ZERO_59
+                             + Optional('.' + Optional(_UNSIGNED_INT)))))
+_ALT_HMS_TIME0_SHORT = (_ALT_ZERO_23_SHORT + Suppress(':') + _ALT_ZERO_59
+                        + Optional(Suppress(':')
+                                   + Combine(_ALT_ZERO_59
+                                   + Optional('.' + Optional(_UNSIGNED_INT)))))
+_ALT_UTC_TIME0 = _ALT_HMS_TIME0.copy() + Suppress(Literal('Z'))
+_ALT_UTC_TIME0_SHORT = _ALT_HMS_TIME0_SHORT.copy() + Suppress(Literal('Z'))
 
 class _SimpleTime(_Time):
     """Time without time zone, with optional "Z"."""
@@ -288,7 +293,6 @@ class _HmsTime(_SimpleTime):
     """A time of day, excluding a time zone."""
 
     type_ = 'local_time'
-    grammar = _HMS_TIME
 
     def __init__(self, s, loc, tokens):
         _SimpleTime.__init__(self, s, loc, tokens)
@@ -298,68 +302,93 @@ class _UtcTime(_SimpleTime):
     """A time of day with "Z" suffix."""
 
     type_ = 'utc_time'
-    grammar = _UTC_TIME
 
     def __init__(self, s, loc, tokens):
         _SimpleTime.__init__(self, s, loc, tokens)
         self.z = 'Z'
 
-_HMS_TIME.set_parse_action(_HmsTime)
-_UTC_TIME.set_parse_action(_UtcTime)
+_HMS_TIME0.set_parse_action(_HmsTime)
+_UTC_TIME0.set_parse_action(_UtcTime)
+_ALT_HMS_TIME0.set_parse_action(_HmsTime)
+_ALT_UTC_TIME0.set_parse_action(_UtcTime)
+_ALT_HMS_TIME0_SHORT.set_parse_action(_HmsTime)
+_ALT_UTC_TIME0_SHORT.set_parse_action(_UtcTime)
 
-_HMS_TIME1.set_parse_action(_HmsTime)   # parse action applied but no quotes allowed
-_UTC_TIME1.set_parse_action(_UtcTime)
+_HMS_TIME = _HMS_TIME0 | (Suppress('"') + _HMS_TIME0 + Suppress('"'))
+_HMS_TIME.set_name('_HMS_TIME')
+_HmsTime.grammar = _HMS_TIME
+
+_UTC_TIME = _UTC_TIME0 | (Suppress('"') + _UTC_TIME0 + Suppress('"'))
+_UTC_TIME.set_name('_UTC_TIME')
+_UtcTime.grammar = _UTC_TIME
+
+_ALT_HMS_TIME = _ALT_HMS_TIME0_SHORT | (Suppress('"') + _ALT_HMS_TIME0 + Suppress('"'))
+_ALT_HMS_TIME.set_name('_ALT_HMS_TIME')
+_HmsTime.alt_grammar = _ALT_HMS_TIME
+
+_ALT_UTC_TIME = _ALT_UTC_TIME0_SHORT | (Suppress('"') + _ALT_UTC_TIME0 + Suppress('"'))
+_ALT_UTC_TIME.set_name('_ALT_UTC_TIME')
+_UtcTime.alt_grammar = _ALT_UTC_TIME
 
 ##########################################################################################
 # _TimeZone
 ##########################################################################################
-_ALT_ZERO_23 = _ZERO_23 | Word(nums, max=1)
-_TIME_ZONE = Combine(_SIGN + _ALT_ZERO_23) + Optional(Suppress(':') + _ZERO_59)
+_TZ_HOUR = (one_of(['-12', '-11', '-10', '+10', '+11', '+12', '+13', '+14'])
+            | Combine(_SIGN + Word('0', nums, exact=2))
+            | Combine(_SIGN + Word(nums, exact=1)))
+_TZ_MINUTE = one_of([':00', ':15', ':30', ':45', ''])
+_TIME_ZONE = Combine(_TZ_HOUR + _TZ_MINUTE)
 _TIME_ZONE.set_name('_TIME_ZONE')
+
+_ALT_TZ_HOUR = (one_of(['-12', '-11', '-10', '+10', '+11', '+12', '+13', '+14'])
+                | Combine(_SIGN + Word(' 0', nums, exact=2))
+                | Combine(_SIGN + Word(nums, exact=1)))
+_ALT_TZ_MINUTE = one_of([':00', ':15', ':30', ':45', '', ': 0'])
+_ALT_TIME_ZONE = Combine(_ALT_TZ_HOUR + _ALT_TZ_MINUTE)
+_ALT_TIME_ZONE.set_name('_ALT_TIME_ZONE')
 
 class _TimeZone(_Item):
     """A time zone."""
 
     type_ = 'time_zone'
     grammar = _TIME_ZONE
+    alt_grammar = _ALT_TIME_ZONE
     suffixes = ('sec', 'fmt')
 
     def __init__(self, s, loc, tokens):
-        self.tokens = tokens
-        sign = -1 if tokens[0][0] == '-' else 1
-        hours = int(tokens[0])
-        minutes = 60 * hours + sign * (int(tokens[1]) if len(tokens) > 1 else 0)
-
-        self.sec = 60 * minutes
+        self.token = tokens[0]
+        sign = -1 if self.token[0] == '-' else 1
+        parts = self.token.partition(':')
+        hours = int(parts[0][1:])
+        minutes = int(parts[2]) if parts[2] else 0
+        self.sec = sign * (3600 * hours + 60 * minutes)
         self.value = dt.timezone(dt.timedelta(seconds=self.sec))
-        self.fmt = str(self)
+        if parts[2]:
+            self.fmt = '%s%02d:%02d' % ('-' if self.sec < 0 else '+', hours, minutes)
+        else:
+            self.fmt = '%s%02d' % ('-' if self.sec < 0 else '+', hours)
 
     @property
     def source(self):
-        return ':'.join(self.tokens)
+        return self.token
 
     def __str__(self):
-        if len(self.tokens) == 1:
-            return '%+03d:00' % int(self.tokens[0])
-        else:
-            sign = self.tokens[0][0]
-            hours = abs(int(self.tokens[0]))
-            return sign + '%02d' % hours + ':' + self.tokens[1]
+        return self.fmt
 
 _TIME_ZONE.set_parse_action(_TimeZone)
+_ALT_TIME_ZONE.set_parse_action(_TimeZone)
 
 ##########################################################################################
 # _ZonedTime
 ##########################################################################################
-_ZONED_TIME0 = _HMS_TIME1 + _TIME_ZONE
-_ZONED_TIME = _ZONED_TIME0 | (Suppress('"') + _ZONED_TIME0 + Suppress('"'))
-_ZONED_TIME.set_name('_ZONED_TIME')
+_ZONED_TIME0 = _HMS_TIME0 + _TIME_ZONE
+_ALT_ZONED_TIME0 = _ALT_HMS_TIME0 + _ALT_TIME_ZONE
+_ALT_ZONED_TIME0_SHORT = _ALT_HMS_TIME0_SHORT + _ALT_TIME_ZONE
 
 class _ZonedTime(_Time):
     """A time of day with a time zone."""
 
     type_ = 'zoned_time'
-    alt_grammar = _ZONED_TIME
     suffixes = ('sec', 'fmt')
 
     def __init__(self, s, loc, tokens):
@@ -379,18 +408,32 @@ class _ZonedTime(_Time):
     def __str__(self):
         return str(self.hms_time) + str(self.time_zone)
 
-_ZONED_TIME.set_parse_action(_ZonedTime)
+_ZONED_TIME0.set_parse_action(_ZonedTime)
+_ALT_ZONED_TIME0.set_parse_action(_ZonedTime)
+_ALT_ZONED_TIME0_SHORT.set_parse_action(_ZonedTime)
 
+_ZONED_TIME = _ZONED_TIME0 | (Suppress('"') + _ZONED_TIME0 + Suppress('"'))
+_ZONED_TIME.set_name('_ZONED_TIME')
+_ZonedTime.grammar = _ZONED_TIME
+
+_ALT_ZONED_TIME = (_ALT_ZONED_TIME0_SHORT
+                   | (Suppress('"') + _ALT_ZONED_TIME0 + Suppress('"')))
+_ALT_ZONED_TIME.set_name('_ALT_ZONED_TIME')
+_ZonedTime.alt_grammar = _ALT_ZONED_TIME
+
+# NOTE: time zones disabled for method="strict"
+# _TIME0 = _ZONED_TIME0 | _UTC_TIME0 | _HMS_TIME0
+_TIME0 = _UTC_TIME0 | _HMS_TIME0
+_ALT_TIME0 = _ALT_ZONED_TIME0 | _ALT_UTC_TIME0 | _ALT_HMS_TIME0
+
+# _TIME = _ZONED_TIME | _UTC_TIME | _HMS_TIME
 _TIME = _UTC_TIME | _HMS_TIME
 _TIME.set_name('_TIME')
 _Time.grammar = _TIME
 
-_ALT_TIME = _ZONED_TIME | _UTC_TIME | _HMS_TIME
+_ALT_TIME = _ALT_ZONED_TIME | _ALT_UTC_TIME | _ALT_HMS_TIME
 _ALT_TIME.set_name('_ALT_TIME')
 _Time.alt_grammar = _ALT_TIME
-
-_TIME1 = _UTC_TIME1 | _HMS_TIME1    # parse action applied but no quotes allowed
-_ALT_TIME1 = _ZONED_TIME | _UTC_TIME1 | _HMS_TIME1
 
 ##########################################################################################
 # _Date
@@ -403,16 +446,19 @@ _DOY = (Word('0123', nums, exact=3))
 _YMD_DATE = _YEAR + Suppress('-') + _MONTH + Suppress('-') + _DAY
 _YD_DATE = _YEAR + Suppress('-') + _DOY
 _DATE0 = _YMD_DATE | _YD_DATE
-_DATE1 = _DATE0.copy()
 
-_DATE = _DATE0 | (Suppress('"') + _DATE0 + Suppress('"'))
-_DATE.set_name('_DATE')
+_ALT_MONTH = _MONTH | Word(' ', '123456789', exact=2)
+_ALT_DAY = _DAY | Word(' ', '123456789', exact=2)
+_ALT_DOY = (_DOY | Word(' ', nums, exact=3)
+            | Combine(Literal('  ') + Word('123456789', exact=1)))
+_ALT_YMD_DATE = _YEAR + Suppress('-') + _ALT_MONTH + Suppress('-') + _ALT_DAY
+_ALT_YD_DATE = _YEAR + Suppress('-') + _ALT_DOY
+_ALT_DATE0 = _ALT_YMD_DATE | _ALT_YD_DATE
 
 class _Date(_Scalar):
     """A date as year, month and day or year and day-of-year."""
 
     type_ = 'date'
-    grammar = _DATE
     suffixes = ('day', 'fmt')
 
     def __init__(self, s, loc, tokens):
@@ -426,27 +472,28 @@ class _Date(_Scalar):
         self.fmt = str(self)
 
     def __str__(self):
-        return '-'.join(self.tokens)
+        return '-'.join(self.tokens).replace(' ', '0')
 
-_DATE.set_parse_action(_Date)
-_DATE1.set_parse_action(_Date)  # parse action applied but no quotes allowed
+_DATE0.set_parse_action(_Date)
+_ALT_DATE0.set_parse_action(_Date)
+
+_DATE = _DATE0 | (Suppress('"') + _DATE0 + Suppress('"'))
+_DATE.set_name('_DATE')
+_Date.grammar = _DATE
+
+_ALT_DATE = _ALT_DATE0 | (Suppress('"') + _ALT_DATE0 + Suppress('"'))
+_ALT_DATE.set_name('_ALT_DATE')
+_Date.alt_grammar = _ALT_DATE
 
 ##########################################################################################
 # _DateTime
 ##########################################################################################
-_DATE_TIME0 = _DATE1 + Suppress('T') + _TIME1
-_DATE_TIME = _DATE_TIME0 | (Suppress('"') + _DATE_TIME0 + Suppress('"'))
-_DATE_TIME.set_name('_DATE_TIME')
-
-_ALT_DATE_TIME0 = _DATE1 + Suppress('T') + _ALT_TIME1
-_ALT_DATE_TIME = _ALT_DATE_TIME0 | (Suppress('"') + _ALT_DATE_TIME0 + Suppress('"'))
-_ALT_DATE_TIME.set_name('_ALT_DATE_TIME')
+_DATE_TIME0 = _DATE0 + Suppress('T') + _TIME0
+_ALT_DATE_TIME0 = _ALT_DATE0 + Suppress('T') + _ALT_TIME0
 
 class _DateTime(_Scalar):
 
     type_ = 'date_time'
-    grammar = _DATE_TIME
-    alt_grammar = _ALT_DATE_TIME
     suffixes = ('day', 'sec', 'fmt')
 
     def __init__(self, s, loc, tokens):
@@ -471,8 +518,16 @@ class _DateTime(_Scalar):
     def __str__(self):
         return str(self.date) + 'T' + str(self.time)
 
-_DATE_TIME.set_parse_action(_DateTime)
-_ALT_DATE_TIME.set_parse_action(_DateTime)
+_DATE_TIME0.set_parse_action(_DateTime)
+_ALT_DATE_TIME0.set_parse_action(_DateTime)
+
+_DATE_TIME = _DATE_TIME0 | (Suppress('"') + _DATE_TIME0 + Suppress('"'))
+_DATE_TIME.set_name('_DATE_TIME')
+_DateTime.grammar = _DATE_TIME
+
+_ALT_DATE_TIME = _ALT_DATE_TIME0 | (Suppress('"') + _ALT_DATE_TIME0 + Suppress('"'))
+_ALT_DATE_TIME.set_name('_ALT_DATE_TIME')
+_DateTime.alt_grammar = _ALT_DATE_TIME
 
 ##########################################################################################
 # _Text
@@ -557,7 +612,7 @@ _SCALAR = _DATE_TIME | _DATE | _TIME | _NUMBER | _TEXT_VALUE    # Order counts!
 _SCALAR.set_name('_SCALAR')
 _Scalar.grammar = _SCALAR
 
-_ALT_SCALAR = _ALT_DATE_TIME | _DATE | _ALT_TIME | _NUMBER | _ALT_TEXT_VALUE
+_ALT_SCALAR = _ALT_DATE_TIME | _ALT_DATE | _ALT_TIME | _NUMBER | _ALT_TEXT_VALUE
 _ALT_SCALAR.set_name('_ALT_SCALAR')
 _Scalar.alt_grammar = _ALT_SCALAR
 
