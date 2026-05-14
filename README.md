@@ -21,6 +21,7 @@
 ![GitHub License](https://img.shields.io/github/license/SETI/rms-pdsparser)
 [![Number of GitHub stars](https://img.shields.io/github/stars/SETI/rms-pdsparser)](https://github.com/SETI/rms-pdsparser/stargazers)
 ![GitHub forks](https://img.shields.io/github/forks/SETI/rms-pdsparser)
+[![DOI](https://zenodo.org/badge/709386326.svg)](https://zenodo.org/badge/latestdoi/709386326)
 
 # Introduction
 
