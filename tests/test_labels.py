@@ -412,10 +412,10 @@ class Test_labels(unittest.TestCase):
         self.assertEqual(d1.filepath, FCPath(filepath))
         self.assertIsInstance(d1.filepath, FCPath)
         self.assertEqual(PdsLabel(str(filepath)).filepath, FCPath(filepath))
-        self.assertEqual(d3.filepath, '')
-        self.assertEqual(d4.filepath, '')
+        self.assertIsNone(d3.filepath)
+        self.assertIsNone(d4.filepath)
         self.assertEqual(d1._filepath, d1.filepath)     # deprecated name
-        self.assertEqual(d4._filepath, '')
+        self.assertIsNone(d4._filepath)
 
         self.assertRaises(ValueError, PdsLabel, filepath, method='whatever')
         self.assertRaises(ValueError, PdsLabel, 999)

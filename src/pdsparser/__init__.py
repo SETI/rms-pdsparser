@@ -406,8 +406,8 @@ class Pds3Label:
             dict (dict): The actual dictionary containing all the label content. However,
                 note that most of the Python dictionary API is implemented directly by
                 this class, so label[keyword] is the same as label.dict[keyword].
-            filepath (FCPath | str): The path to the label file; an empty string if
-                `label` contains label content rather than a file path.
+            filepath (FCPath | None): The path to the label file; None if `label`
+                contains label content rather than a file path.
         """
 
         if method not in {'strict', 'loose', 'compound', 'fast'}:
@@ -415,7 +415,7 @@ class Pds3Label:
 
         self._fast = (method == 'fast')
         self.content = ''
-        self.filepath = ''
+        self.filepath = None
 
         # Interpret `label` input
         if isinstance(label, list):
