@@ -48,14 +48,14 @@ def _pass(testcase, type_, string, value, strval=None, vtype=None, test=3, super
             break
 
         grammars = [cls.grammar] if (test & 1) else []
-        if (test & 2) and 'alt_grammar' in cls.__dict__.keys():
+        if (test & 2) and 'alt_grammar' in cls.__dict__:
             grammars.append(cls.alt_grammar)
 
         if not grammars:
             raise ValueError(f'no grammar selected: {cls}, test={test}')
 
-        for k, grammar in enumerate(grammars):
-            # print('_pass', repr(string), cls, len(grammars), k)
+        for _k, grammar in enumerate(grammars):
+            # print('_pass', repr(string), cls, len(grammars), _k)
             try:
                 obj = (grammar + StringEnd()).parse_string(string)[0]
             except ParseException:
@@ -91,14 +91,14 @@ def _fail(testcase, type_, string, test=3, super_=True):
             break
 
         grammars = [cls.grammar] if (test & 1) else []
-        if (test & 2) and 'alt_grammar' in cls.__dict__.keys():
+        if (test & 2) and 'alt_grammar' in cls.__dict__:
             grammars.append(cls.alt_grammar)
 
         if not grammars:
             raise ValueError(f'no grammar selected: {cls}, test={test}')
 
-        for k, grammar in enumerate(grammars):
-            # print('_fail', repr(string), cls, len(grammars), k)
+        for _k, grammar in enumerate(grammars):
+            # print('_fail', repr(string), cls, len(grammars), _k)
             testcase.assertRaises(ParseException, (grammar + StringEnd()).parse_string,
                                   string)
 
@@ -606,7 +606,7 @@ class Test_Set(unittest.TestCase):
         self.assertEqual(obj.type_, 'set')
         self.assertEqual(str(obj), '{1, 2, 3}')
         self.assertEqual(repr(obj), '_Set(1, 2, 3)')
-        self.assertEqual(obj, {1, 2, 3, 2})
+        self.assertEqual(obj, {1, 2, 3})
         self.assertEqual(obj.list, [1, 2, 3])
 
         _pass(self, _Set, '{1, 2\n,3}', {1, 2, 3}, '{1, 2, 3}')

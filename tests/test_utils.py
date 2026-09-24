@@ -3,7 +3,6 @@
 ##########################################################################################
 
 import pathlib
-import sys
 import unittest
 
 # Note: most functions in _utils.py are tested fully by test_labels.py.
@@ -11,7 +10,7 @@ import pdsparser
 from pdsparser import is_pds3_file
 from pdsparser._utils import _unwrap
 
-ROOT_DIR = pathlib.Path(sys.modules['pdsparser'].__file__).parent.parent
+ROOT_DIR = pathlib.Path(__file__).parent.parent
 TEST_FILE_DIR = ROOT_DIR / 'test_files'
 
 

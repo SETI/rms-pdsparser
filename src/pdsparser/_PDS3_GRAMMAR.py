@@ -31,7 +31,7 @@ _KEYWORD = Combine(Word(_caps, _middle) + ZeroOrMore(Literal('_') + Word(_middle
 # _Item
 ##########################################################################################
 
-class _Item():
+class _Item:
     """Abstract class for any part of a PDS3 label."""
 
     # Attribute names to be added to dictionary along with `value`
@@ -364,9 +364,9 @@ class _TimeZone(_Item):
         self.sec = sign * (3600 * hours + 60 * minutes)
         self.value = dt.timezone(dt.timedelta(seconds=self.sec))
         if parts[2]:
-            self.fmt = '%s%02d:%02d' % ('-' if self.sec < 0 else '+', hours, minutes)
+            self.fmt = f"{'-' if self.sec < 0 else '+'}{hours:02d}:{minutes:02d}"
         else:
-            self.fmt = '%s%02d' % ('-' if self.sec < 0 else '+', hours)
+            self.fmt = f"{'-' if self.sec < 0 else '+'}{hours:02d}"
 
     @property
     def source(self):

@@ -271,7 +271,7 @@ _PARSERS = {'strict': _PDS3_LABEL, 'loose': _ALT_PDS3_LABEL, 'compound': _COMPOU
 # Pds3Label
 ##########################################################################################
 
-class Pds3Label():
+class Pds3Label:
     """Class representing the parsed content of a PDS3 label."""
 
     def __init__(self, label, method='strict', *, expand=False, fmt_dirs=[],
@@ -280,7 +280,7 @@ class Pds3Label():
         """Constructor for a Pds3Label.
 
         Parameters:
-            label (str, list, pathlib.Path, or filecache.FCPath):
+            label (str | list[str] | Path | FCPath):
                 The label, defined as a path to a file or as the content of a label. The
                 content can be represented by a single string with <LF> or <CR><LF>
                 terminators, or as a list of strings with optional terminators. If the
@@ -308,12 +308,12 @@ class Pds3Label():
                 True to replace the content of any ^STRUCTURE keyword in the label with
                 the content of the associated ".FMT" file.
 
-            fmt_dirs (str, pathlib.Path, filecache.FCPath, or list, optional):
+            fmt_dirs (str | Path | FCPath | list[str | Path | FCPath], optional):
                 One or more directory paths to search for ".FMT" files. Note that if
                 `label` indicates a file path, the parent directory of that file is always
                 searched first.
 
-            repairs (tuple or list[tuple]):
+            repairs (tuple[str, str] | list[tuple[str, str]], optional):
                 One or more two-element tuples of the form (pattern, replacement), where
                 the first item is a regular expression and the second is the string with
                 which to replace it. These repair patterns are applied to the label
@@ -467,7 +467,7 @@ class Pds3Label():
                 message = str(err)
                 if message[:2] == ', ':
                     message = message[2:]
-                raise PdsSyntaxError(message)
+                raise PdsSyntaxError(message) from err
 
             self.dict = self._python_dict(types=types, sources=sources,
                                           first_suffix=first_suffix, details=_details)
@@ -603,7 +603,7 @@ class Pds3Label():
             dict_list[-1][key] = dict_
 
         if len(dict_list) > 1:
-            name = list(dict_list[-1].keys())[0]    # dicts preserve key order
+            name = next(iter(dict_list[-1]))    # dicts preserve key order
             raise PdsSyntaxError(f'missing END_{name}')
 
         return apply_first_suffix(dict_list[0], dup_sets[0])

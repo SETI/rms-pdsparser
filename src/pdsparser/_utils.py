@@ -21,7 +21,7 @@ def read_label(filepath, *, chars=4000):
     """Read the PDS3 label from a file. Supports attached labels within binary files.
 
     Parameters:
-        filepath (str, pathlib.Path, or filecache.FCPath): The path to the file. If the
+        filepath (str | Path | FCPath): The path to the file. If the
             file does not contain a PDS3 label, a detached label (with the same path but
             ending in ".lbl" or ".LBL") is read instead.
         chars (int, optional): Initial number of characters to read from the top of a
@@ -101,7 +101,7 @@ def read_vax_binary_label(filepath):
     records.
 
     Parameters:
-        filepath (str, pathlib.Path, or filecache.FCPath): The path to the file. A
+        filepath (str | Path | FCPath): The path to the file. A
             detached label (ending in ".lbl" or ".LBL") is read using "stream" format;
             any other file is read assuming Vax variable-length format (in which the first
             two bytes of each record contain the length of the remaining
@@ -154,14 +154,14 @@ def expand_structures(content, fmt_dirs=[], *, repairs=[], label_path=None):
     ".FMT" files.
 
     Parameters:
-        fmt_dirs (str, pathlib.Path, filecache.FCPath, or list, optional):
+        fmt_dirs (str | Path | FCPath | list[str | Path | FCPath], optional):
             One or more directory paths to search for the ".FMT" files.
-        repairs (tuple or list[tuple]):
+        repairs (tuple[str, str] | list[tuple[str, str]], optional):
             One or more two-element tuples of the form (pattern, replacement), where the
             first item is a regular expression and the second is the string with which to
             replace it. These repair patterns are applied to the label content before it
             is parsed, and make it possible to repair known syntax errors.
-        label_path (str, pathlib.Path, filecache.FCPath, optional):
+        label_path (str | Path | FCPath, optional):
             The path to the label file from which the content was obtained; if provided,
             the parent directory of this files is the first to be searched for .FMT files.
 
@@ -180,7 +180,7 @@ def expand_structures(content, fmt_dirs=[], *, repairs=[], label_path=None):
     # Obtain the list of directories to search
     if not isinstance(fmt_dirs, (list, tuple)):
         fmt_dirs = [fmt_dirs]
-    fmt_dirs = [FCPath(dir) for dir in fmt_dirs]
+    fmt_dirs = [FCPath(fmt_dir) for fmt_dir in fmt_dirs]
     if label_path:
         fmt_dirs = [FCPath(label_path).parent] + fmt_dirs
     if not fmt_dirs:        # if no path is provided, search the local default dir
@@ -331,9 +331,7 @@ def _unwrap(text):
     for part in parts[1:]:
         if not part:
             new_parts.append('\n\n')
-        elif part[0].isspace():
-            new_parts.append(part)
-        elif new_parts[-1][-1].isspace():
+        elif part[0].isspace() or new_parts[-1][-1].isspace():
             new_parts.append(part)
         else:
             new_parts.append(' ' + part)

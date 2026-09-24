@@ -307,7 +307,7 @@ def _to_dict(lines, types=False, sources=False, first_suffix=True):
                             group_keys[-1][group_keys[-1].index(key)] = key + '_1'
                         continue
                     remainder = key[len(dup):]
-                    if not remainder == remainder.lower():
+                    if remainder != remainder.lower():
                         continue
                     if remainder[1:2].isdigit():
                         continue

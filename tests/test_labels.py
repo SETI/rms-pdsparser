@@ -4,14 +4,13 @@
 
 import datetime
 import pathlib
-import sys
 import unittest
 
 from filecache import FCPath
 from pdsparser import Pds3Label, PdsLabel, PdsError, PdsSyntaxError
 from pdsparser._PDS3_GRAMMAR import _Text, _Integer
 
-ROOT_DIR = pathlib.Path(sys.modules['pdsparser'].__file__).parent.parent
+ROOT_DIR = pathlib.Path(__file__).parent.parent
 TEST_FILE_DIR = ROOT_DIR / 'test_files'
 
 MAXDIFF = 300

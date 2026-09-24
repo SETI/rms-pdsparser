@@ -1,16 +1,24 @@
+.. rms-pdsparser documentation master file
 
-Welcome to ``pdsparser``'s documentation!
-===========================================
+Welcome to the Documentation for rms-pdsparser!
+======================================================================
 
 .. include:: ../README.md
    :parser: myst_parser.sphinx_
-   :start-after: forks/SETI/rms-pdsparser)
+   :start-after: <!-- start-after-point -->
 
 .. toctree::
    :maxdepth: 2
-   :caption: Contents:
+   :caption: API Reference:
 
    module
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Project:
+
+   contributing
+   CODE_OF_CONDUCT
 
 Indices and tables
 ==================
