@@ -8,7 +8,7 @@ import sys
 import unittest
 
 from filecache import FCPath
-from pdsparser import Pds3Label, PdsLabel
+from pdsparser import Pds3Label, PdsLabel, PdsError, PdsSyntaxError
 from pdsparser._PDS3_GRAMMAR import _Text, _Integer
 
 ROOT_DIR = pathlib.Path(sys.modules['pdsparser'].__file__).parent.parent
@@ -89,15 +89,15 @@ class Test_labels(unittest.TestCase):
 
         # Labels with syntax errors
         filepath = TEST_FILE_DIR / 'v1877838443_1-EXCEPTION.lbl'
-        self.assertRaisesRegex(SyntaxError, "Expected end of text, found .*",
+        self.assertRaisesRegex(PdsSyntaxError, "Expected end of text, found .*",
                                Pds3Label, filepath, method='loose')
 
         filepath = TEST_FILE_DIR / 'v1877838443_1-EXCEPTION2.lbl'
-        self.assertRaisesRegex(SyntaxError, 'missing END_OBJECT',
+        self.assertRaisesRegex(PdsSyntaxError, 'missing END_OBJECT',
                                Pds3Label, filepath, method='loose')
 
         filepath = TEST_FILE_DIR / 'v1877838443_1-EXCEPTION3.lbl'
-        self.assertRaisesRegex(SyntaxError, 'unbalanced END_OBJECT',
+        self.assertRaisesRegex(PdsSyntaxError, 'unbalanced END_OBJECT',
                                Pds3Label, filepath, method='loose')
 
     def test_GOxxx_v1(self):
@@ -336,7 +336,7 @@ class Test_labels(unittest.TestCase):
         self.assertEqual(d2.dict, answer_dict)
 
         # This FMT has a missing quote in the first DESCRIPTION
-        self.assertRaisesRegex(SyntaxError, "Expected end of text, found .*",
+        self.assertRaisesRegex(PdsSyntaxError, "Expected end of text, found .*",
                                Pds3Label, filepath, method='loose', expand=True,
                                repairs=[(r'"IRIS_ROWFMT\.FMT"',
                                          '"IRISHEDR-with-error.FMT"')])
@@ -409,15 +409,30 @@ class Test_labels(unittest.TestCase):
         d4 = PdsLabel(d1.content.split('\n'), method='strict', types=True, sources=True)
         self.assertEqual(d4.dict, answer_dict)
 
+        # filepath property
+        self.assertEqual(d1.filepath, FCPath(filepath))
+        self.assertIsInstance(d1.filepath, FCPath)
+        self.assertEqual(PdsLabel(str(filepath)).filepath, FCPath(filepath))
+        self.assertEqual(d3.filepath, '')
+        self.assertEqual(d4.filepath, '')
+        self.assertEqual(d1._filepath, d1.filepath)     # deprecated name
+        self.assertEqual(d4._filepath, '')
+
         self.assertRaises(ValueError, PdsLabel, filepath, method='whatever')
         self.assertRaises(ValueError, PdsLabel, 999)
 
         # Attached label failure
         filepath = TEST_FILE_DIR / 'empty.dat'
-        self.assertRaisesRegex(SyntaxError, r'missing END statement in .*empty\.dat',
+        self.assertRaisesRegex(PdsSyntaxError, r'missing END statement in .*empty\.dat',
                                Pds3Label, filepath)
-        self.assertRaisesRegex(SyntaxError, r'missing END statement in .*empty\.dat',
+        self.assertRaisesRegex(PdsSyntaxError, r'missing END statement in .*empty\.dat',
                                Pds3Label, filepath, vax=True)
+
+        # PdsSyntaxError is both a SyntaxError and a PdsError
+        self.assertTrue(issubclass(PdsSyntaxError, SyntaxError))
+        self.assertTrue(issubclass(PdsSyntaxError, PdsError))
+        self.assertRaises(SyntaxError, Pds3Label, filepath)
+        self.assertRaises(PdsError, Pds3Label, filepath)
 
         # __setitem__
         d4['FOO'] = 'BAR'
@@ -426,47 +441,48 @@ class Test_labels(unittest.TestCase):
         # Mixed units, method='fast'
         content = 'VECTOR = (1 <km>, 10 <s>)\nEND\n'
         d1 = Pds3Label(content)         # no problem if method='strict'
-        self.assertRaisesRegex(SyntaxError, 'mixture of units encountered at VECTOR, .*',
+        self.assertRaisesRegex(PdsSyntaxError,
+                               'mixture of units encountered at VECTOR, .*',
                                Pds3Label, content, method='fast')
 
         # Unbalanced OBJECT/END_OBJECT
         content = 'OBJECT = FOO\nEND\n'
         for method in ('strict', 'loose', 'fast'):
-            self.assertRaisesRegex(SyntaxError, 'missing END_OBJECT.*',
+            self.assertRaisesRegex(PdsSyntaxError, 'missing END_OBJECT.*',
                                    Pds3Label, content, method=method)
 
         content = 'OBJECT = FOO\nEND_OBJECT = BAR\nEND\n'
         for method in ('strict', 'loose', 'fast'):
-            self.assertRaisesRegex(SyntaxError, 'unbalanced END_OBJECT = BAR.*',
+            self.assertRaisesRegex(PdsSyntaxError, 'unbalanced END_OBJECT = BAR.*',
                                    Pds3Label, content, method=method)
 
         content = 'END_OBJECT = BAR\nEND\n'
         for method in ('strict', 'loose', 'fast'):
-            self.assertRaisesRegex(SyntaxError, 'unbalanced END_OBJECT = BAR.*',
+            self.assertRaisesRegex(PdsSyntaxError, 'unbalanced END_OBJECT = BAR.*',
                                    Pds3Label, content, method=method)
 
         content = 'END_OBJECT\nEND\n'
-        self.assertRaisesRegex(SyntaxError, r"found '\\n' .*",
+        self.assertRaisesRegex(PdsSyntaxError, r"found '\\n' .*",
                                Pds3Label, content, method='strict')
         for method in ('loose', 'fast'):
-            self.assertRaisesRegex(SyntaxError, 'unbalanced END_OBJECT[^=]*',
+            self.assertRaisesRegex(PdsSyntaxError, 'unbalanced END_OBJECT[^=]*',
                                    Pds3Label, content, method=method)
 
         content = 'VALUE = "abc\nEND\n'
         for method in ('strict', 'loose', 'fast'):
-            self.assertRaisesRegex(SyntaxError, 'Expected \'"\', found end of text.*',
+            self.assertRaisesRegex(PdsSyntaxError, 'Expected \'"\', found end of text.*',
                                    Pds3Label, content, method=method)
 
         content = 'VALUE = (1,2\nEND\n'
-        self.assertRaisesRegex(SyntaxError, 'unbalanced parentheses ()',
+        self.assertRaisesRegex(PdsSyntaxError, 'unbalanced parentheses ()',
                                Pds3Label, content, method='fast')
 
         content = 'VALUE = {1,2\nEND\n'
-        self.assertRaisesRegex(SyntaxError, 'unbalanced braces {}',
+        self.assertRaisesRegex(PdsSyntaxError, 'unbalanced braces {}',
                                Pds3Label, content, method='fast')
 
         content = 'VALUE\nEND\n'
-        self.assertRaisesRegex(SyntaxError, 'missing "=" at VALUE, line 1',
+        self.assertRaisesRegex(PdsSyntaxError, 'missing "=" at VALUE, line 1',
                                Pds3Label, content, method='fast')
 
         # _details=True

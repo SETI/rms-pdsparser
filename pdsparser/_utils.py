@@ -7,6 +7,16 @@ import re
 from filecache import FCPath
 
 
+class PdsError(Exception):
+    """Generic PDS label error."""
+    pass
+
+
+class PdsSyntaxError(SyntaxError, PdsError):
+    """PDS label syntax error."""
+    pass
+
+
 def read_label(filepath, *, chars=4000):
     """Read the PDS3 label from a file. Supports attached labels within binary files.
 
@@ -23,7 +33,7 @@ def read_label(filepath, *, chars=4000):
 
     Raises:
         FileNotFoundError: If the label file is missing.
-        SyntaxError: If the END statement is not found in a binary file.
+        PdsSyntaxError: If the END statement is not found in a binary file.
 
     Notes:
         If the `filepath` ends in ".lbl" or ".LBL", it is assumed to refer to a detached
@@ -83,7 +93,7 @@ def read_label(filepath, *, chars=4000):
         if alt_filepath.exists():
             return read_label(alt_filepath)
 
-    raise SyntaxError(f'missing END statement in {filepath}')
+    raise PdsSyntaxError(f'missing END statement in {filepath}')
 
 
 def read_vax_binary_label(filepath):
@@ -103,6 +113,7 @@ def read_vax_binary_label(filepath):
 
     Raises:
         FileNotFoundError: If the label file is missing.
+        PdsSyntaxError: If the END statement is not found.
     """
 
     filepath = FCPath(filepath)
@@ -135,7 +146,7 @@ def read_vax_binary_label(filepath):
         if alt_filepath.exists():
             return read_label(alt_filepath)
 
-    raise SyntaxError(f'missing END statement in {filepath}')
+    raise PdsSyntaxError(f'missing END statement in {filepath}')
 
 
 def expand_structures(content, fmt_dirs=[], *, repairs=[], label_path=None):
@@ -205,6 +216,15 @@ def expand_structures(content, fmt_dirs=[], *, repairs=[], label_path=None):
         content = content[:k0] + fmt_content + content[k1:]
 
     return content
+
+
+def is_pds3_file(filepath):
+    """True if this file appears to contain a PDS3 label, either attached or detached."""
+
+    filepath = FCPath(filepath)
+    with filepath.open(mode='rb') as f:
+        text = f.read(300)
+    return (b'PDS_VERSION_ID' in text or b'SFDU_LABEL' in text)
 
 
 def _format_float(value):

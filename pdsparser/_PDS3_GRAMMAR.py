@@ -13,7 +13,7 @@ try:
 except ImportError:     # pragma: no cover
     __version__ = 'Version unspecified'
 
-from .utils import _based_int, _format_float, _is_identifier, _unwrap
+from ._utils import _based_int, _format_float, _is_identifier, _unwrap
 
 ParserElement.set_default_whitespace_chars('')
 _WHITE = Suppress(Optional(Word(' \t')))

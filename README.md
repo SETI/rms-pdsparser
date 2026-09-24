@@ -240,7 +240,8 @@ Four methods of parsing the label are provided.
 
 * `method="strict"` uses a strict implementation of the PDS3 syntax. It is sure to provide
   accurate results, but can be rather slow. This method can also be used to validate the
-  syntax within a PDS3 label, because it will raise a SyntaxError if anything goes wrong.
+  syntax within a PDS3 label, because it will raise a PdsSyntaxError if anything goes
+  wrong.
 * `method="loose"` uses a variant of the "strict" method, in which allowance is made for
   certain common syntax errors. Specifically,
 
@@ -266,15 +267,17 @@ Four methods of parsing the label are provided.
 
 The `pdsparser` module provides several additional utilities for handling PDS3 labels.
 
-- `read_label`[![image](https://raw.githubusercontent.com/SETI/rms-pdsparser/main/icons/link.png)](https://rms-pdsparser.readthedocs.io/en/latest/module.html#pdsparser.utils.read_label):
+- `read_label`[![image](https://raw.githubusercontent.com/SETI/rms-pdsparser/main/icons/link.png)](https://rms-pdsparser.readthedocs.io/en/latest/module.html#pdsparser.read_label):
   Reads a PDS3 label from a file. Supports attached labels
   within binary files.
-- `read_vax_binary_label`[![image](https://raw.githubusercontent.com/SETI/rms-pdsparser/main/icons/link.png)](https://rms-pdsparser.readthedocs.io/en/latest/module.html#pdsparser.utils.read_vax_binary_label):
+- `read_vax_binary_label`[![image](https://raw.githubusercontent.com/SETI/rms-pdsparser/main/icons/link.png)](https://rms-pdsparser.readthedocs.io/en/latest/module.html#pdsparser.read_vax_binary_label):
   Reads the attached PDS3 label from an old-style
   Vax binary file that uses variable-length records.
-- `expand_structures`[![image](https://raw.githubusercontent.com/SETI/rms-pdsparser/main/icons/link.png)](https://rms-pdsparser.readthedocs.io/en/latest/module.html#pdsparser.utils.expand_structures):
+- `expand_structures`[![image](https://raw.githubusercontent.com/SETI/rms-pdsparser/main/icons/link.png)](https://rms-pdsparser.readthedocs.io/en/latest/module.html#pdsparser.expand_structures):
   Replaces any `^STRUCTURE` keywords in a label string
   with the content of the associated ".FMT" files.
+- `is_pds3_file`[![image](https://raw.githubusercontent.com/SETI/rms-pdsparser/main/icons/link.png)](https://rms-pdsparser.readthedocs.io/en/latest/module.html#pdsparser.is_pds3_file):
+  Returns True if a file appears to contain a PDS3 label, either attached or detached.
 
 # Contributing
 

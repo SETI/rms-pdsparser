@@ -210,7 +210,8 @@ Four methods of parsing the label are provided.
 
 * `method="strict"` uses a strict implementation of the PDS3 syntax. It is sure to provide
   accurate results, but can be rather slow. This method can also be used to validate the
-  syntax within a PDS3 label, because it will raise a SyntaxError if anything goes wrong.
+  syntax within a PDS3 label, because it will raise a PdsSyntaxError if anything goes
+  wrong.
 * `method="loose"` uses a variant of the "strict" method, in which allowance is made for
   certain common syntax errors. Specifically,
 
@@ -238,12 +239,14 @@ Utilities
 
 The `pdsparser` module provides several additional utilities for handling PDS3 labels.
 
-- :meth:`~utils.read_label`: Reads a PDS3 label from a file. Supports attached labels
+- :func:`read_label`: Reads a PDS3 label from a file. Supports attached labels
   within binary files.
-- :meth:`~utils.read_vax_binary_label`: Reads the attached PDS3 label from an old-style
+- :func:`read_vax_binary_label`: Reads the attached PDS3 label from an old-style
   Vax binary file that uses variable-length records.
-- :meth:`~utils.expand_structures`: Replaces any `^STRUCTURE` keywords in a label string
+- :func:`expand_structures`: Replaces any `^STRUCTURE` keywords in a label string
   with the content of the associated ".FMT" files.
+- :func:`is_pds3_file`: Returns True if a file appears to contain a PDS3 label, either
+  attached or detached.
 """
 
 import datetime as dt
@@ -257,8 +260,9 @@ try:
 except ImportError:         # pragma: no cover
     __version__ = 'Version unspecified'
 
-from .utils import read_label, read_vax_binary_label, expand_structures, _unique_key
 from ._fast_dict import _fast_dict
+from ._utils import (expand_structures, is_pds3_file, read_label, read_vax_binary_label,
+                     PdsError, PdsSyntaxError, _unique_key)
 from ._PDS3_GRAMMAR import _PDS3_LABEL, _ALT_PDS3_LABEL, _COMPOUND_LABEL
 
 _PARSERS = {'strict': _PDS3_LABEL, 'loose': _ALT_PDS3_LABEL, 'compound': _COMPOUND_LABEL}
@@ -350,7 +354,7 @@ class Pds3Label():
 
         Raises:
             FileNotFoundError: If the label file is missing.
-            SyntaxError: If the label content contains invalid syntax.
+            PdsSyntaxError: If the label content contains invalid PDS label syntax.
 
         Notes:
             The label information is preserved as a dictionary using the value before
@@ -402,14 +406,16 @@ class Pds3Label():
             dict (dict): The actual dictionary containing all the label content. However,
                 note that most of the Python dictionary API is implemented directly by
                 this class, so label[keyword] is the same as label.dict[keyword].
+            filepath (FCPath | str): The path to the label file; an empty string if
+                `label` contains label content rather than a file path.
         """
 
         if method not in {'strict', 'loose', 'compound', 'fast'}:
             raise ValueError('invalid method: ' + repr(method))
 
-        self._filepath = ''
         self._fast = (method == 'fast')
         self.content = ''
+        self.filepath = ''
 
         # Interpret `label` input
         if isinstance(label, list):
@@ -419,20 +425,22 @@ class Pds3Label():
             if '\n' in label:
                 self.content = label
             else:
-                self._filepath = FCPath(label)
+                self.filepath = FCPath(label)
         elif isinstance(label, (pathlib.Path, FCPath)):
-            self._filepath = FCPath(label)
+            self.filepath = FCPath(label)
         else:
             raise ValueError('invalid label')
 
+        self._filepath = self.filepath      # for backward compatibility
+
         # Read the label content if necessary
-        if self._filepath:
+        if self.filepath:
             if vax:
-                self.content = read_vax_binary_label(self._filepath)
+                self.content = read_vax_binary_label(self.filepath)
             elif method == 'compound':
-                self.content = FCPath(self._filepath).read_text(encoding='latin-1')
+                self.content = FCPath(self.filepath).read_text(encoding='latin-1')
             else:
-                self.content = read_label(self._filepath)
+                self.content = read_label(self.filepath)
 
         # Repair content if necessary
         # We need to repair the content before expanding structures in case the repair
@@ -445,7 +453,7 @@ class Pds3Label():
         # Replace ^STRUCTURE if necessary
         if expand:
             self.content = expand_structures(self.content, fmt_dirs=fmt_dirs,
-                                             repairs=repairs, label_path=self._filepath)
+                                             repairs=repairs, label_path=self.filepath)
 
         # Parse label
         if method == 'fast':
@@ -455,11 +463,11 @@ class Pds3Label():
         else:
             try:
                 self._statements = _PARSERS[method].parse_string(self.content)
-            except ParseException as err:       # convert parse exception to SyntaxError
+            except ParseException as err:   # convert parse exception to PdsSyntaxError
                 message = str(err)
                 if message[:2] == ', ':
                     message = message[2:]
-                raise SyntaxError(message)
+                raise PdsSyntaxError(message)
 
             self.dict = self._python_dict(types=types, sources=sources,
                                           first_suffix=first_suffix, details=_details)
@@ -574,7 +582,7 @@ class Pds3Label():
             # Check for END_OBJECT without OBJECT
             tail = '' if item is None else ' = ' + item.value
             if name[4:] not in dict_:
-                raise SyntaxError(f'unbalanced {name}{tail}')
+                raise PdsSyntaxError(f'unbalanced {name}{tail}')
 
             # Get a missing value for END_OBJECT or END_GROUP
             if item is None:
@@ -584,7 +592,7 @@ class Pds3Label():
 
             # Check for OBJECT/END_OBJECT mismatch
             if item.value != dict_[name[4:]].value:
-                raise SyntaxError(f'unbalanced {name}{tail}')
+                raise PdsSyntaxError(f'unbalanced {name}{tail}')
 
             # Pop this dictionary and insert it into the higher-level dictionary
             dict_ = dict_list.pop()
@@ -596,7 +604,7 @@ class Pds3Label():
 
         if len(dict_list) > 1:
             name = list(dict_list[-1].keys())[0]    # dicts preserve key order
-            raise SyntaxError(f'missing END_{name}')
+            raise PdsSyntaxError(f'missing END_{name}')
 
         return apply_first_suffix(dict_list[0], dup_sets[0])
 
@@ -728,5 +736,8 @@ class Pds3Label():
 
 # Deprecated name for the class
 PdsLabel = Pds3Label
+
+__all__ = ['expand_structures', 'is_pds3_file', 'read_label', 'read_vax_binary_label',
+           'Pds3Label', 'PdsLabel', 'PdsError', 'PdsSyntaxError']
 
 ##########################################################################################

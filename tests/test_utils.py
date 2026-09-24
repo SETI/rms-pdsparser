@@ -1,14 +1,44 @@
 ##########################################################################################
-# pdsparser/test_labels.py
+# pdsparser/test_utils.py
 ##########################################################################################
 
+import pathlib
+import sys
 import unittest
 
 # Note: most functions in _utils.py are tested fully by test_labels.py.
-from pdsparser.utils import _unwrap
+import pdsparser
+from pdsparser import is_pds3_file
+from pdsparser._utils import _unwrap
+
+ROOT_DIR = pathlib.Path(sys.modules['pdsparser'].__file__).parent.parent
+TEST_FILE_DIR = ROOT_DIR / 'test_files'
 
 
 class Test_utils(unittest.TestCase):
+
+    def test_is_pds3_file(self):
+
+        # Detached labels
+        self.assertTrue(is_pds3_file(TEST_FILE_DIR / 'v1877838443_1.lbl'))
+        filepath = str(TEST_FILE_DIR / 'JNCE_2022348_47C00007_V01.LBL')
+        self.assertTrue(is_pds3_file(filepath))
+
+        # Attached labels starting with an SFDU label
+        self.assertTrue(is_pds3_file(TEST_FILE_DIR / 'v1877838443_1.qub'))
+        self.assertTrue(is_pds3_file(TEST_FILE_DIR / 'C3438954.IMQ'))  # Vax format
+
+        # Not PDS3 labels
+        self.assertFalse(is_pds3_file(TEST_FILE_DIR / 'empty.dat'))
+        self.assertFalse(is_pds3_file(TEST_FILE_DIR / 'pdsdd-short.full'))
+        self.assertFalse(is_pds3_file(TEST_FILE_DIR / 'IRISHEDR.FMT'))
+
+        self.assertRaises(FileNotFoundError, is_pds3_file, TEST_FILE_DIR / 'missing.lbl')
+
+    def test_public_api(self):
+
+        for name in pdsparser.__all__:
+            self.assertTrue(hasattr(pdsparser, name), name)
 
     def test_unwrap(self):
 
