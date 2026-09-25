@@ -2,612 +2,692 @@
 # pdsparser/test_labels.py
 ##########################################################################################
 
-import datetime
+import datetime     # needed to eval the answer files
 import pathlib
-import unittest
 
+import pytest
 from filecache import FCPath
+
 from pdsparser import Pds3Label, PdsLabel, PdsError, PdsSyntaxError
 from pdsparser._PDS3_GRAMMAR import _Text, _Integer
 
 ROOT_DIR = pathlib.Path(__file__).parent.parent
 TEST_FILE_DIR = ROOT_DIR / 'test_files'
 
-MAXDIFF = 300
+# Quote the unquoted N/A values in v1877838443_1.lbl, so method='strict' can parse it
+N_A_REPAIR = (r'(?<!["\'])N/A', "'N/A'")
 
-class Test_labels(unittest.TestCase):
 
-    def test_COVIMS_0xxx(self):
+def _answer(filename):
+    """The dictionary stored in an answer file."""
+    return eval((TEST_FILE_DIR / filename).read_text())
 
-        self.maxDiff = MAXDIFF
 
-        # This file has an un-quoted N/A, so method='loose'
-        root = 'v1877838443_1'
-        filepath = TEST_FILE_DIR / (root + '.lbl')
-        d1 = Pds3Label(filepath, method='loose', types=True, sources=True, expand=False)
-        answer = (TEST_FILE_DIR / (root + '-lbl-answer.txt')).read_text()
-        answer_dict = eval(answer)
-        self.assertEqual(d1.dict, answer_dict)
+def _quote_n_a_sources(answer):
+    """Update an answer dictionary for the effect of N_A_REPAIR."""
+    for key in ('GAIN_MODE_ID_source', 'BACKGROUND_SAMPLING_MODE_ID_source'):
+        answer[key] = answer[key].replace('N/A', "'N/A'")
+    return answer
 
-        d2 = Pds3Label(filepath, method='fast', types=True, sources=True, expand=False)
-        self.assertEqual(d2.dict, answer_dict)
 
-        # Test repairs, change strict to True
-        d1 = Pds3Label(filepath, method='strict', types=True, sources=True, expand=False,
-                       repairs=(r'(?<!["\'])N/A', "'N/A'"))
-        for key in ('GAIN_MODE_ID_source',  'BACKGROUND_SAMPLING_MODE_ID_source'):
-            answer_dict[key] = answer_dict[key].replace('N/A', "'N/A'")
-        self.assertEqual(d1.dict, answer_dict)
+##########################################################################################
+# COVIMS_0xxx: v1877838443_1
+##########################################################################################
 
-        d2 = Pds3Label(filepath, method='fast', types=True, sources=True, expand=False,
-                       repairs=(r'(?<!["\'])N/A', "'N/A'"))
-        self.assertEqual(d2.dict, answer_dict)
+COVIMS_LBL = TEST_FILE_DIR / 'v1877838443_1.lbl'
 
-        # Test first_suffix=False
-        d3 = Pds3Label(filepath, method='strict', types=True, sources=True, expand=False,
-                       repairs=(r'(?<!["\'])N/A', "'N/A'"), first_suffix=False)
-        subdict = answer_dict['SPECTRAL_QUBE']
-        for key in ('^STRUCTURE_1', '^STRUCTURE_1_type', '^STRUCTURE_1_source',
-                    '^STRUCTURE_1_fmt'):
-            subdict[key[:10] + key[12:]] = subdict[key]
-            del subdict[key]
-        self.assertEqual(d3.dict, answer_dict)
 
-        # expand=True
-        d1 = Pds3Label(filepath, method='loose', types=True, sources=True, expand=True)
-        answer = (TEST_FILE_DIR / (root + '-lbl-expanded.txt')).read_text()
-        answer_dict = eval(answer)
-        self.assertEqual(d1.dict, answer_dict)
+# This file has an un-quoted N/A, so method='loose'
+@pytest.mark.parametrize('method', ['loose', 'fast'])
+def test_covims(method):
+    label = Pds3Label(COVIMS_LBL, method=method, types=True, sources=True, expand=False)
+    assert label.dict == _answer('v1877838443_1-lbl-answer.txt')
 
-        d1 = Pds3Label(filepath, method='loose', types=True, sources=True, expand=True,
-                       fmt_dirs=['./'])     # this value of fmt_dirs is not used
-        self.assertEqual(d1.dict, answer_dict)
 
-        d2 = Pds3Label(filepath, method='fast', types=True, sources=True, expand=True)
-        self.assertEqual(d2.dict, answer_dict)
+@pytest.mark.parametrize('method', ['strict', 'fast'])
+def test_covims_repaired(method):
+    label = Pds3Label(COVIMS_LBL, method=method, types=True, sources=True, expand=False,
+                      repairs=N_A_REPAIR)
+    assert label.dict == _quote_n_a_sources(_answer('v1877838443_1-lbl-answer.txt'))
 
-        d1 = Pds3Label(filepath, method='strict', types=True, sources=True, expand=True,
-                       repairs=(r'(?<!["\'])N/A', "'N/A'"))
-        for key in ('GAIN_MODE_ID_source',  'BACKGROUND_SAMPLING_MODE_ID_source'):
-            answer_dict[key] = answer_dict[key].replace('N/A', "'N/A'")
-        self.assertEqual(d1.dict, answer_dict)
 
-        d2 = Pds3Label(filepath, method='fast', types=True, sources=True, expand=True,
-                       repairs=(r'(?<!["\'])N/A', "'N/A'"))
-        self.assertEqual(d2.dict, answer_dict)
+def test_covims_first_suffix_false():
 
-        # label from qub
-        filepath = TEST_FILE_DIR / (root + '.qub')
-        d1 = Pds3Label(filepath, method='strict', types=True, sources=True)
-        answer = (TEST_FILE_DIR / (root + '-qub-answer.txt')).read_text()
-        answer_dict = eval(answer)
-        self.assertEqual(d1.dict, answer_dict)
+    label = Pds3Label(COVIMS_LBL, method='strict', types=True, sources=True,
+                      expand=False, repairs=N_A_REPAIR, first_suffix=False)
 
-        d2 = Pds3Label(filepath, method='fast', types=True, sources=True)
-        self.assertEqual(d2.dict, answer_dict)
+    answer = _quote_n_a_sources(_answer('v1877838443_1-lbl-answer.txt'))
+    subdict = answer['SPECTRAL_QUBE']
+    for key in ('^STRUCTURE_1', '^STRUCTURE_1_type', '^STRUCTURE_1_source',
+                '^STRUCTURE_1_fmt'):
+        subdict[key[:10] + key[12:]] = subdict.pop(key)
 
-        # Labels with syntax errors
-        filepath = TEST_FILE_DIR / 'v1877838443_1-EXCEPTION.lbl'
-        self.assertRaisesRegex(PdsSyntaxError, "Expected end of text, found .*",
-                               Pds3Label, filepath, method='loose')
+    assert label.dict == answer
 
-        filepath = TEST_FILE_DIR / 'v1877838443_1-EXCEPTION2.lbl'
-        self.assertRaisesRegex(PdsSyntaxError, 'missing END_OBJECT',
-                               Pds3Label, filepath, method='loose')
 
-        filepath = TEST_FILE_DIR / 'v1877838443_1-EXCEPTION3.lbl'
-        self.assertRaisesRegex(PdsSyntaxError, 'unbalanced END_OBJECT',
-                               Pds3Label, filepath, method='loose')
+@pytest.mark.parametrize('method', ['loose', 'fast'])
+def test_covims_expanded(method):
+    label = Pds3Label(COVIMS_LBL, method=method, types=True, sources=True, expand=True)
+    assert label.dict == _answer('v1877838443_1-lbl-expanded.txt')
 
-    def test_GOxxx_v1(self):
 
-        self.maxDiff = MAXDIFF
+def test_covims_expanded_unused_fmt_dirs():
 
-        root = 'C052079-2800R'
-        filepath = TEST_FILE_DIR / (root + '.LBL')
-        d1 = Pds3Label(filepath, method='loose', types=True, sources=True, expand=False)
-        answer = (TEST_FILE_DIR / (root + '-answer.txt')).read_text()
-        self.assertEqual(d1.dict, eval(answer))
+    # The .FMT file is found next to the label, so this value of fmt_dirs is not used
+    label = Pds3Label(COVIMS_LBL, method='loose', types=True, sources=True, expand=True,
+                      fmt_dirs=['./'])
+    assert label.dict == _answer('v1877838443_1-lbl-expanded.txt')
 
-        d2 = Pds3Label(filepath, method='fast', types=True, sources=True, expand=False)
-        self.assertEqual(d2.dict, eval(answer))
 
-        # vax=True doesn't matter if this is a label file
-        d3 = Pds3Label(filepath, method='loose', types=True, sources=True, expand=False,
-                       vax=True)
-        self.assertEqual(d3.dict, eval(answer))
+@pytest.mark.parametrize('method', ['strict', 'fast'])
+def test_covims_expanded_repaired(method):
+    label = Pds3Label(COVIMS_LBL, method=method, types=True, sources=True, expand=True,
+                      repairs=N_A_REPAIR)
+    assert label.dict == _quote_n_a_sources(_answer('v1877838443_1-lbl-expanded.txt'))
 
-        d1 = Pds3Label(filepath, method='loose', types=True, sources=True, expand=True)
-        answer = (TEST_FILE_DIR / (root + '-expanded.txt')).read_text()
-        self.assertEqual(d1.dict, eval(answer))
 
-        d2 = Pds3Label(filepath, method='fast', types=True, sources=True, expand=True)
-        self.assertEqual(d2.dict, eval(answer))
+@pytest.mark.parametrize('method', ['strict', 'fast'])
+def test_covims_attached_label(method):
+    label = Pds3Label(TEST_FILE_DIR / 'v1877838443_1.qub', method=method, types=True,
+                      sources=True)
+    assert label.dict == _answer('v1877838443_1-qub-answer.txt')
 
-    def text_JNOJIR_xxxx(self):
 
-        self.maxDiff = MAXDIFF
+@pytest.mark.parametrize(('filename', 'message'), [
+    ('v1877838443_1-EXCEPTION.lbl', r'Expected end of text, found .*'),
+    ('v1877838443_1-EXCEPTION2.lbl', 'missing END_OBJECT'),
+    ('v1877838443_1-EXCEPTION3.lbl', 'unbalanced END_OBJECT'),
+])
+def test_covims_syntax_errors(filename, message):
+    with pytest.raises(PdsSyntaxError, match=message):
+        Pds3Label(TEST_FILE_DIR / filename, method='loose')
 
-        root = 'JIR_LOG_SPE_RDR_2020048T195001_V01'
-        filepath = TEST_FILE_DIR / (root + '.LBL')
-        d1 = Pds3Label(filepath, method='strict', types=True, sources=True)
-        answer = (TEST_FILE_DIR / (root + '-answer.txt')).read_text()
-        self.assertEqual(d1.dict, eval(answer))
 
-        d2 = Pds3Label(filepath, method='fast', types=True, sources=True)
-        self.assertEqual(d2.dict, eval(answer))
+##########################################################################################
+# GOxxx_v1: C052079-2800R
+##########################################################################################
 
-    def text_JNOJNC_0xxx(self):
+GO_LBL = TEST_FILE_DIR / 'C052079-2800R.LBL'
 
-        self.maxDiff = MAXDIFF
 
-        root = 'JNCE_2022348_47C00007_V01'
-        filepath = TEST_FILE_DIR / (root + '.LBL')
-        d1 = Pds3Label(filepath, method='strict', types=True, sources=True)
-        answer = (TEST_FILE_DIR / (root + '-answer.txt')).read_text()
-        self.assertEqual(d1.dict, eval(answer))
+@pytest.mark.parametrize('method', ['loose', 'fast'])
+def test_go(method):
+    label = Pds3Label(GO_LBL, method=method, types=True, sources=True, expand=False)
+    assert label.dict == _answer('C052079-2800R-answer.txt')
 
-        d2 = Pds3Label(filepath, method='fast', types=True, sources=True)
-        self.assertEqual(d2.dict, eval(answer))
 
-    def test_NHxxLO_xxxx(self):
+def test_go_vax_ignored_for_label_file():
+    label = Pds3Label(GO_LBL, method='loose', types=True, sources=True, expand=False,
+                      vax=True)
+    assert label.dict == _answer('C052079-2800R-answer.txt')
 
-        self.maxDiff = MAXDIFF
 
-        root = 'lor_0284676508_0x630_sci'
-        filepath = TEST_FILE_DIR / (root + '.lbl')
-        d1 = Pds3Label(filepath, method='strict', types=True, sources=True)
-        answer = (TEST_FILE_DIR / (root + '-answer.txt')).read_text()
-        self.assertEqual(d1.dict, eval(answer))
+@pytest.mark.parametrize('method', ['loose', 'fast'])
+def test_go_expanded(method):
+    label = Pds3Label(GO_LBL, method=method, types=True, sources=True, expand=True)
+    assert label.dict == _answer('C052079-2800R-expanded.txt')
 
-        d2 = Pds3Label(filepath, method='fast', types=True, sources=True)
-        self.assertEqual(d2.dict, eval(answer))
 
-    def test_VGISS_xxxx(self):
+##########################################################################################
+# JNOJIR_xxxx, JNOJNC_0xxx, NHxxLO_xxxx
+##########################################################################################
 
-        self.maxDiff = MAXDIFF
+# This answer file predates first_suffix=True as the default
+@pytest.mark.parametrize('method', ['strict', 'fast'])
+def test_jnojir(method):
+    label = Pds3Label(TEST_FILE_DIR / 'JIR_LOG_SPE_RDR_2020048T195001_V01.LBL',
+                      method=method, types=True, sources=True, first_suffix=False)
+    assert label.dict == _answer('JIR_LOG_SPE_RDR_2020048T195001_V01-answer.txt')
 
-        root = 'C3450702_GEOMED'
-        filepath = TEST_FILE_DIR / (root + '.LBL')
-        d1 = Pds3Label(filepath, method='strict', types=True, sources=True)
-        answer = (TEST_FILE_DIR / (root + '-answer.txt')).read_text()
-        self.assertEqual(d1.dict, eval(answer))
 
-        d2 = Pds3Label(filepath, method='fast', types=True, sources=True)
-        self.assertEqual(d2.dict, eval(answer))
+@pytest.mark.parametrize('method', ['strict', 'fast'])
+def test_jnojnc(method):
+    label = Pds3Label(TEST_FILE_DIR / 'JNCE_2022348_47C00007_V01.LBL', method=method,
+                      types=True, sources=True)
+    assert label.dict == _answer('JNCE_2022348_47C00007_V01-answer.txt')
 
-        d1 = Pds3Label(filepath, method='strict')
-        answer = (TEST_FILE_DIR / (root + '-short.txt')).read_text()
-        self.assertEqual(d1.dict, eval(answer))
 
-        d2 = Pds3Label(filepath, method='fast')
-        self.assertEqual(d2.dict, eval(answer))
+@pytest.mark.parametrize('method', ['strict', 'fast'])
+def test_nhxxlo(method):
+    label = Pds3Label(TEST_FILE_DIR / 'lor_0284676508_0x630_sci.lbl', method=method,
+                      types=True, sources=True)
+    assert label.dict == _answer('lor_0284676508_0x630_sci-answer.txt')
 
-        self.assertEqual(len(d1), 61)
-        pairs = [('PDS_VERSION_ID', 'PDS3'),
-                 ('RECORD_TYPE', 'FIXED_LENGTH'),
-                 ('RECORD_BYTES', 2000),
-                 ('FILE_RECORDS', 1001),
-                 ('^VICAR_HEADER', 'C3450702_GEOMED.IMG'),
-                 ('^VICAR_HEADER_offset', 1),
-                 ('^VICAR_HEADER_unit', ''),
-                 ('^VICAR_HEADER_fmt', '("C3450702_GEOMED.IMG", 1)'),
-                 ('^IMAGE', 'C3450702_GEOMED.IMG'),
-                 ('^IMAGE_offset', 2),
-                 ('^IMAGE_unit', ''),
-                 ('^IMAGE_fmt', '("C3450702_GEOMED.IMG", 2)'),
-                 ('DATA_SET_ID', 'VG1/VG2-S-ISS-2/3/4/6-PROCESSED-V1.1'),
-                 ('PRODUCT_ID', 'C3450702_GEOMED.IMG'),
-                 ('PRODUCT_CREATION_TIME', datetime.datetime(2012, 5, 1, 16, 0)),
-                 ('PRODUCT_CREATION_TIME_day', 4504),
-                 ('PRODUCT_CREATION_TIME_sec', 57600),
-                 ('PRODUCT_CREATION_TIME_fmt', '2012-05-01T16:00:00')]
-        self.assertEqual(list(d1.items())[:18], pairs)
-        self.assertEqual(list(d1.keys())[:18], [p[0] for p in pairs])
-        self.assertEqual(list(d1.values())[:18], [p[1] for p in pairs])
-        self.assertEqual(d1['PDS_VERSION_ID'], 'PDS3')
-        self.assertEqual(d1.get('PDS_VERSION_ID', 'whatever'), 'PDS3')
-        self.assertEqual(d1.get('PDS_VERSION_IDx', 'whatever'), 'whatever')
-        self.assertTrue('PDS_VERSION_ID' in d1)
-        self.assertTrue('PDS_VERSION_IDx' not in d1)
 
-        for test in (str(d1), repr(d1), str(d2), repr(d2)):
-            lines = test.split('\n')
-            self.assertEqual(lines[:9],
-                             ['PDS_VERSION_ID = PDS3',
-                              'RECORD_TYPE = FIXED_LENGTH',
-                              'RECORD_BYTES = 2000',
-                              'FILE_RECORDS = 1001',
-                              '^VICAR_HEADER = ("C3450702_GEOMED.IMG", 1)',
-                              '^IMAGE = ("C3450702_GEOMED.IMG", 2)',
-                              'DATA_SET_ID = "VG1/VG2-S-ISS-2/3/4/6-PROCESSED-V1.1"',
-                              'PRODUCT_ID = "C3450702_GEOMED.IMG"',
-                              'PRODUCT_CREATION_TIME = 2012-05-01T16:00:00'])
+##########################################################################################
+# VGISS_xxxx: C3450702_GEOMED
+##########################################################################################
 
-        test = Pds3Label.from_file(str(filepath))
-        self.assertEqual(test.dict, d1.dict)
+VGISS_LBL = TEST_FILE_DIR / 'C3450702_GEOMED.LBL'
 
-        test = Pds3Label.from_string(d1.content)
-        self.assertEqual(test.dict, d1.dict)
 
-        _ = Pds3Label.load_file(FCPath(filepath))
-        test = Pds3Label.from_string(d1.content)
-        self.assertEqual(test.dict, d1.dict)
+@pytest.mark.parametrize('method', ['strict', 'fast'])
+def test_vgiss(method):
+    label = Pds3Label(VGISS_LBL, method=method, types=True, sources=True)
+    assert label.dict == _answer('C3450702_GEOMED-answer.txt')
 
-        d3 = Pds3Label(filepath, method='strict', _details=True)
-        detail = d3['^VICAR_HEADER_detail']
-        self.assertEqual(detail.value, d3['^VICAR_HEADER'])
-        self.assertEqual(detail.offset, 1)
-        self.assertEqual(detail.unit, '')
-        self.assertEqual(detail.source, '("C3450702_GEOMED.IMG", 1)')
-        self.assertEqual(str(detail), '("C3450702_GEOMED.IMG", 1)')
 
-        detail = d3['EXPOSURE_DURATION_detail']
-        self.assertEqual(detail.value, 1.92)
-        self.assertEqual(detail.unit, '<SECOND>')
-        self.assertEqual(str(detail), '1.92 <SECOND>')
+@pytest.mark.parametrize('method', ['strict', 'fast'])
+def test_vgiss_without_types_or_sources(method):
+    label = Pds3Label(VGISS_LBL, method=method)
+    assert label.dict == _answer('C3450702_GEOMED-short.txt')
 
-        detail = d3['FILTER_NAME_detail']
-        self.assertEqual(detail.value, 'VIOLET')
-        self.assertEqual(str(detail), 'VIOLET')
 
-        # Failover from data file to detached label
-        root = 'C3450702_GEOMED'
-        filepath = TEST_FILE_DIR / (root + '.empty')
-        d1 = Pds3Label(filepath, method='strict', types=True, sources=True)
-        answer = (TEST_FILE_DIR / (root + '-answer.txt')).read_text()
-        self.assertEqual(d1.dict, eval(answer))
+def test_dict_api():
 
-        d1 = Pds3Label(filepath, method='strict', types=True, sources=True, vax=True)
-        self.assertEqual(d1.dict, eval(answer))
+    label = Pds3Label(VGISS_LBL, method='strict')
+    assert len(label) == 61
 
-    def test_VG_0xxx(self):
+    pairs = [('PDS_VERSION_ID', 'PDS3'),
+             ('RECORD_TYPE', 'FIXED_LENGTH'),
+             ('RECORD_BYTES', 2000),
+             ('FILE_RECORDS', 1001),
+             ('^VICAR_HEADER', 'C3450702_GEOMED.IMG'),
+             ('^VICAR_HEADER_offset', 1),
+             ('^VICAR_HEADER_unit', ''),
+             ('^VICAR_HEADER_fmt', '("C3450702_GEOMED.IMG", 1)'),
+             ('^IMAGE', 'C3450702_GEOMED.IMG'),
+             ('^IMAGE_offset', 2),
+             ('^IMAGE_unit', ''),
+             ('^IMAGE_fmt', '("C3450702_GEOMED.IMG", 2)'),
+             ('DATA_SET_ID', 'VG1/VG2-S-ISS-2/3/4/6-PROCESSED-V1.1'),
+             ('PRODUCT_ID', 'C3450702_GEOMED.IMG'),
+             ('PRODUCT_CREATION_TIME', datetime.datetime(2012, 5, 1, 16, 0)),
+             ('PRODUCT_CREATION_TIME_day', 4504),
+             ('PRODUCT_CREATION_TIME_sec', 57600),
+             ('PRODUCT_CREATION_TIME_fmt', '2012-05-01T16:00:00')]
+    assert list(label.items())[:18] == pairs
+    assert list(label.keys())[:18] == [p[0] for p in pairs]
+    assert list(label.values())[:18] == [p[1] for p in pairs]
 
-        self.maxDiff = MAXDIFF
+    assert label['PDS_VERSION_ID'] == 'PDS3'
+    assert label.get('PDS_VERSION_ID', 'whatever') == 'PDS3'
+    assert label.get('PDS_VERSION_IDx', 'whatever') == 'whatever'
+    assert 'PDS_VERSION_ID' in label
+    assert 'PDS_VERSION_IDx' not in label
 
-        root = 'C3438954'
-        filepath = TEST_FILE_DIR / (root + '.IMQ')
-        d1 = Pds3Label(filepath, method='loose', types=True, sources=True, expand=False,
-                       vax=True)
-        answer = (TEST_FILE_DIR / (root + '-answer.txt')).read_text()
-        answer_dict = eval(answer)
-        self.assertEqual(d1.dict, answer_dict)
 
-        d2 = Pds3Label(filepath, method='fast', types=True, sources=True, expand=False,
-                       vax=True)
-        self.assertEqual(d2.dict, answer_dict)
+@pytest.mark.parametrize('method', ['strict', 'fast'])
+@pytest.mark.parametrize('func', [str, repr])
+def test_str_and_repr(method, func):
 
-        # sources=False
-        for obj in ('IMAGE_HISTOGRAM', 'ENCODING_HISTOGRAM', 'ENGINEERING_TABLE',
-                    'IMAGE'):
-            for key in list(answer_dict[obj].keys()):
-                if key.endswith('_source'):
-                    del answer_dict[obj][key]
-        for key in list(answer_dict.keys()):
+    label = Pds3Label(VGISS_LBL, method=method)
+    lines = func(label).split('\n')
+    assert lines[:9] == ['PDS_VERSION_ID = PDS3',
+                         'RECORD_TYPE = FIXED_LENGTH',
+                         'RECORD_BYTES = 2000',
+                         'FILE_RECORDS = 1001',
+                         '^VICAR_HEADER = ("C3450702_GEOMED.IMG", 1)',
+                         '^IMAGE = ("C3450702_GEOMED.IMG", 2)',
+                         'DATA_SET_ID = "VG1/VG2-S-ISS-2/3/4/6-PROCESSED-V1.1"',
+                         'PRODUCT_ID = "C3450702_GEOMED.IMG"',
+                         'PRODUCT_CREATION_TIME = 2012-05-01T16:00:00']
+
+
+def test_deprecated_constructors():
+
+    label = Pds3Label(VGISS_LBL, method='strict')
+
+    assert Pds3Label.from_file(str(VGISS_LBL)).dict == label.dict
+    assert Pds3Label.from_string(label.content).dict == label.dict
+
+    lines = Pds3Label.load_file(FCPath(VGISS_LBL))
+    assert ''.join(lines) == label.content
+    assert Pds3Label.from_string(lines).dict == label.dict
+
+
+def test_details():
+
+    label = Pds3Label(VGISS_LBL, method='strict', _details=True)
+
+    detail = label['^VICAR_HEADER_detail']
+    assert detail.value == label['^VICAR_HEADER']
+    assert detail.offset == 1
+    assert detail.unit == ''
+    assert detail.source == '("C3450702_GEOMED.IMG", 1)'
+    assert str(detail) == '("C3450702_GEOMED.IMG", 1)'
+
+    detail = label['EXPOSURE_DURATION_detail']
+    assert detail.value == 1.92
+    assert detail.unit == '<SECOND>'
+    assert str(detail) == '1.92 <SECOND>'
+
+    detail = label['FILTER_NAME_detail']
+    assert detail.value == 'VIOLET'
+    assert str(detail) == 'VIOLET'
+
+
+@pytest.mark.parametrize('vax', [False, True])
+def test_detached_label_fallback(vax):
+
+    # This data file contains no label, so the detached label is read instead
+    label = Pds3Label(TEST_FILE_DIR / 'C3450702_GEOMED.empty', method='strict',
+                      types=True, sources=True, vax=vax)
+    assert label.dict == _answer('C3450702_GEOMED-answer.txt')
+
+
+##########################################################################################
+# VG_0xxx: C3438954
+##########################################################################################
+
+VG_IMQ = TEST_FILE_DIR / 'C3438954.IMQ'
+
+
+def _remove_sources(answer):
+    """Remove the "_source" keys from the C3438954 answer dictionary."""
+
+    for obj in ('IMAGE_HISTOGRAM', 'ENCODING_HISTOGRAM', 'ENGINEERING_TABLE', 'IMAGE'):
+        for key in list(answer[obj]):
             if key.endswith('_source'):
-                del answer_dict[key]
+                del answer[obj][key]
+    for key in list(answer):
+        if key.endswith('_source'):
+            del answer[key]
+    return answer
 
-        d1 = Pds3Label(filepath, method='loose', types=True, sources=False, expand=False,
-                       vax=True)
-        self.assertEqual(d1.dict, answer_dict)
 
-        d2 = Pds3Label(filepath, method='fast', types=True, sources=False, expand=False,
-                       vax=True)
-        self.assertEqual(d2.dict, answer_dict)
+@pytest.mark.parametrize('method', ['loose', 'fast'])
+def test_vg_vax(method):
+    label = Pds3Label(VG_IMQ, method=method, types=True, sources=True, expand=False,
+                      vax=True)
+    assert label.dict == _answer('C3438954-answer.txt')
 
-        # expand=True
-        d1 = Pds3Label(filepath, method='loose', types=True, sources=True, expand=True,
-                       vax=True, first_suffix=False)
-        answer = (TEST_FILE_DIR / (root + '-expanded.txt')).read_text()
-        self.assertEqual(d1.dict, eval(answer))
 
-        d2 = Pds3Label(filepath, method='fast', types=True, sources=True, expand=True,
-                       vax=True, first_suffix=False)
-        self.assertEqual(d2.dict, eval(answer))
+@pytest.mark.parametrize('method', ['loose', 'fast'])
+def test_vg_vax_without_sources(method):
+    label = Pds3Label(VG_IMQ, method=method, types=True, sources=False, expand=False,
+                      vax=True)
+    assert label.dict == _remove_sources(_answer('C3438954-answer.txt'))
 
-    def test_VG_2001(self):
 
-        self.maxDiff = MAXDIFF
+@pytest.mark.parametrize('method', ['loose', 'fast'])
+def test_vg_vax_expanded(method):
+    label = Pds3Label(VG_IMQ, method=method, types=True, sources=True, expand=True,
+                      vax=True, first_suffix=False)
+    assert label.dict == _answer('C3438954-expanded.txt')
 
-        root = 'VG2_SAT'
-        filepath = TEST_FILE_DIR / (root + '.LBL')
-        d1 = Pds3Label(filepath, method='strict', types=True, sources=True, expand=False)
-        answer = (TEST_FILE_DIR / (root + '-answer.txt')).read_text()
-        answer_dict = eval(answer)
-        self.assertEqual(d1.dict, answer_dict)
 
-        d2 = Pds3Label(filepath, method='fast', types=True, sources=True, expand=False)
-        self.assertEqual(d2.dict, answer_dict)
+##########################################################################################
+# VG_2001: VG2_SAT
+##########################################################################################
 
-        # The name of the ^STRUCTURE file is erroneous
-        self.assertRaises(FileNotFoundError, Pds3Label, filepath, method='strict',
-                          expand=True)
+VG2_LBL = TEST_FILE_DIR / 'VG2_SAT.LBL'
+VG2_FMT_REPAIR = (r'"IRIS_ROWFMT\.FMT"', '"IRISHEDR.FMT"')
+VG2_BAD_FMT_REPAIRS = [(r'"IRIS_ROWFMT\.FMT"', '"IRISHEDR-with-error.FMT"'),
+                       (r'data identifier\.', 'data identifier."')]
 
-        # method='loose' because the FMT file has tabs
-        d1 = Pds3Label(filepath, method='loose', types=False, sources=True, expand=True,
-                       repairs=(r'"IRIS_ROWFMT\.FMT"', '"IRISHEDR.FMT"'))
-        answer = (TEST_FILE_DIR / (root + '-expanded.txt')).read_text()
-        answer_dict = eval(answer)
-        self.assertEqual(d1.dict, answer_dict)
 
-        d2 = Pds3Label(filepath, method='fast', types=False, sources=True, expand=True,
-                       repairs=(r'"IRIS_ROWFMT\.FMT"', '"IRISHEDR.FMT"'))
-        self.assertEqual(d2.dict, answer_dict)
+@pytest.mark.parametrize('method', ['strict', 'fast'])
+def test_vg2_sat(method):
+    label = Pds3Label(VG2_LBL, method=method, types=True, sources=True, expand=False)
+    assert label.dict == _answer('VG2_SAT-answer.txt')
 
-        # This FMT has a missing quote in the first DESCRIPTION
-        self.assertRaisesRegex(PdsSyntaxError, "Expected end of text, found .*",
-                               Pds3Label, filepath, method='loose', expand=True,
-                               repairs=[(r'"IRIS_ROWFMT\.FMT"',
-                                         '"IRISHEDR-with-error.FMT"')])
 
-        d1 = Pds3Label(filepath, method='loose', types=False, sources=True, expand=True,
-                       repairs=[(r'"IRIS_ROWFMT\.FMT"', '"IRISHEDR-with-error.FMT"'),
-                                (r'data identifier\.', 'data identifier."')])
-        self.assertEqual(d1.dict, answer_dict)
+def test_vg2_sat_structure_file_not_found():
 
-        d2 = Pds3Label(filepath, method='fast', types=False, sources=True, expand=True,
-                       repairs=[(r'"IRIS_ROWFMT\.FMT"', '"IRISHEDR-with-error.FMT"'),
-                                (r'data identifier\.', 'data identifier."')])
-        self.assertEqual(d2.dict, answer_dict)
+    # The name of the ^STRUCTURE file is erroneous
+    with pytest.raises(FileNotFoundError):
+        Pds3Label(VG2_LBL, method='strict', expand=True)
 
-        # Without a fmt_dir to work with, it should search the local default dir; this
-        # will still raise FileNotFoundError
-        content = filepath.read_text()
-        self.assertRaises(FileNotFoundError, Pds3Label, content, expand=True)
 
-    def test_pdsdd(self):
+# method='loose' because the FMT file has tabs
+@pytest.mark.parametrize('method', ['loose', 'fast'])
+def test_vg2_sat_expanded(method):
+    label = Pds3Label(VG2_LBL, method=method, types=False, sources=True, expand=True,
+                      repairs=VG2_FMT_REPAIR)
+    assert label.dict == _answer('VG2_SAT-expanded.txt')
 
-        self.maxDiff = MAXDIFF
 
-        root = 'pdsdd-short'
-        filepath = TEST_FILE_DIR / (root + '.full')
-        d1 = Pds3Label(filepath, method='compound')
-        answer = (TEST_FILE_DIR / (root + '-answer.txt')).read_text()
-        answer_dict = eval(answer)
-        self.assertEqual(d1.dict, answer_dict)
+def test_vg2_sat_structure_syntax_error():
 
-        root = 'pdsdd-endless'
-        filepath = TEST_FILE_DIR / (root + '.full')
-        d2 = Pds3Label(filepath, method='loose')    # missing commas in sequences
+    # This FMT has a missing quote in the first DESCRIPTION
+    with pytest.raises(PdsSyntaxError, match=r'Expected end of text, found .*'):
+        Pds3Label(VG2_LBL, method='loose', expand=True, repairs=VG2_BAD_FMT_REPAIRS[:1])
 
-        d1_dict_endless = {}
-        for key, value in d1.dict.items():
-            if key.startswith('END_'):
-                continue
-            d1_dict_endless[key] = value
-        d1_dict_endless['END'] = d1['END_21']
 
-        self.assertEqual(d2.dict, d1_dict_endless)
+@pytest.mark.parametrize('method', ['loose', 'fast'])
+def test_vg2_sat_structure_repaired(method):
 
-    def test_more(self):
+    # Repairs are also applied to the content of the .FMT file
+    label = Pds3Label(VG2_LBL, method=method, types=False, sources=True, expand=True,
+                      repairs=VG2_BAD_FMT_REPAIRS)
+    assert label.dict == _answer('VG2_SAT-expanded.txt')
 
-        self.maxDiff = MAXDIFF
 
-        root = 'TESTS'
-        filepath = TEST_FILE_DIR / (root + '.LBL')
-        d1 = Pds3Label(filepath, method='loose', types=True, sources=True)
-        answer = (TEST_FILE_DIR / (root + '-answer.txt')).read_text()
-        answer_dict = eval(answer)
-        self.assertEqual(d1.dict, answer_dict)
+def test_expand_without_label_path():
 
-        answer_dict['MIXED_SEQ_unit'] = '<km>'
-        d2 = Pds3Label(filepath, method='fast', types=True, sources=True)
-        self.assertEqual(d2.dict, answer_dict)
+    # Without a label path or fmt_dirs, the local default directory is searched; the
+    # .FMT file is not there
+    with pytest.raises(FileNotFoundError):
+        Pds3Label(VG2_LBL.read_text(), expand=True)
 
-        # Tests of alternative inputs
-        root = 'v1877838443_1'
-        filepath = TEST_FILE_DIR / (root + '.qub')
-        d1 = Pds3Label(filepath, method='strict', types=True, sources=True)
-        answer = (TEST_FILE_DIR / (root + '-qub-answer.txt')).read_text()
-        answer_dict = eval(answer)
-        self.assertEqual(d1.dict, answer_dict)
 
-        d3 = PdsLabel(d1.content, method='strict', types=True, sources=True)
-        self.assertEqual(d3.dict, answer_dict)
+##########################################################################################
+# PDS data dictionary
+##########################################################################################
 
-        d4 = PdsLabel(d1.content.split('\n'), method='strict', types=True, sources=True)
-        self.assertEqual(d4.dict, answer_dict)
+def test_compound():
+    label = Pds3Label(TEST_FILE_DIR / 'pdsdd-short.full', method='compound')
+    assert label.dict == _answer('pdsdd-short-answer.txt')
 
-        # filepath property
-        self.assertEqual(d1.filepath, FCPath(filepath))
-        self.assertIsInstance(d1.filepath, FCPath)
-        self.assertEqual(PdsLabel(str(filepath)).filepath, FCPath(filepath))
-        self.assertIsNone(d3.filepath)
-        self.assertIsNone(d4.filepath)
-        self.assertEqual(d1._filepath, d1.filepath)     # deprecated name
-        self.assertIsNone(d4._filepath)
 
-        self.assertRaises(ValueError, PdsLabel, filepath, method='whatever')
-        self.assertRaises(ValueError, PdsLabel, 999)
+def test_compound_without_end_statements():
 
-        # Attached label failure
-        filepath = TEST_FILE_DIR / 'empty.dat'
-        self.assertRaisesRegex(PdsSyntaxError, r'missing END statement in .*empty\.dat',
-                               Pds3Label, filepath)
-        self.assertRaisesRegex(PdsSyntaxError, r'missing END statement in .*empty\.dat',
-                               Pds3Label, filepath, vax=True)
+    compound = Pds3Label(TEST_FILE_DIR / 'pdsdd-short.full', method='compound')
+    expected = {key: value for key, value in compound.dict.items()
+                if not key.startswith('END_')}
+    expected['END'] = compound['END_21']
 
-        # PdsSyntaxError is both a SyntaxError and a PdsError
-        self.assertTrue(issubclass(PdsSyntaxError, SyntaxError))
-        self.assertTrue(issubclass(PdsSyntaxError, PdsError))
-        self.assertRaises(SyntaxError, Pds3Label, filepath)
-        self.assertRaises(PdsError, Pds3Label, filepath)
+    # method='loose' because of missing commas in sequences
+    label = Pds3Label(TEST_FILE_DIR / 'pdsdd-endless.full', method='loose')
+    assert label.dict == expected
 
-        # __setitem__
-        d4['FOO'] = 'BAR'
-        self.assertEqual(d4.dict['FOO'], 'BAR')
 
-        # Mixed units, method='fast'
-        content = 'VECTOR = (1 <km>, 10 <s>)\nEND\n'
-        d1 = Pds3Label(content)         # no problem if method='strict'
-        self.assertRaisesRegex(PdsSyntaxError,
-                               'mixture of units encountered at VECTOR, .*',
-                               Pds3Label, content, method='fast')
+##########################################################################################
+# TESTS.LBL
+##########################################################################################
 
-        # Unbalanced OBJECT/END_OBJECT
-        content = 'OBJECT = FOO\nEND\n'
-        for method in ('strict', 'loose', 'fast'):
-            self.assertRaisesRegex(PdsSyntaxError, 'missing END_OBJECT.*',
-                                   Pds3Label, content, method=method)
+TESTS_LBL = TEST_FILE_DIR / 'TESTS.LBL'
 
-        content = 'OBJECT = FOO\nEND_OBJECT = BAR\nEND\n'
-        for method in ('strict', 'loose', 'fast'):
-            self.assertRaisesRegex(PdsSyntaxError, 'unbalanced END_OBJECT = BAR.*',
-                                   Pds3Label, content, method=method)
 
-        content = 'END_OBJECT = BAR\nEND\n'
-        for method in ('strict', 'loose', 'fast'):
-            self.assertRaisesRegex(PdsSyntaxError, 'unbalanced END_OBJECT = BAR.*',
-                                   Pds3Label, content, method=method)
+def test_tests_label_loose():
+    label = Pds3Label(TESTS_LBL, method='loose', types=True, sources=True)
+    assert label.dict == _answer('TESTS-answer.txt')
 
-        content = 'END_OBJECT\nEND\n'
-        self.assertRaisesRegex(PdsSyntaxError, r"found '\\n' .*",
-                               Pds3Label, content, method='strict')
-        for method in ('loose', 'fast'):
-            self.assertRaisesRegex(PdsSyntaxError, 'unbalanced END_OBJECT[^=]*',
-                                   Pds3Label, content, method=method)
 
-        content = 'VALUE = "abc\nEND\n'
-        for method in ('strict', 'loose', 'fast'):
-            self.assertRaisesRegex(PdsSyntaxError, 'Expected \'"\', found end of text.*',
-                                   Pds3Label, content, method=method)
+def test_tests_label_fast():
 
-        content = 'VALUE = (1,2\nEND\n'
-        self.assertRaisesRegex(PdsSyntaxError, 'unbalanced parentheses ()',
-                               Pds3Label, content, method='fast')
+    answer = _answer('TESTS-answer.txt')
+    answer['MIXED_SEQ_unit'] = '<km>'
 
-        content = 'VALUE = {1,2\nEND\n'
-        self.assertRaisesRegex(PdsSyntaxError, 'unbalanced braces {}',
-                               Pds3Label, content, method='fast')
+    label = Pds3Label(TESTS_LBL, method='fast', types=True, sources=True)
+    assert label.dict == answer
 
-        content = 'VALUE\nEND\n'
-        self.assertRaisesRegex(PdsSyntaxError, 'missing "=" at VALUE, line 1',
-                               Pds3Label, content, method='fast')
 
-        # _details=True
-        content = 'OBJECT = TEST\nVALUE = 7\nEND_OBJECT\nEND\n'
-        d1 = Pds3Label(content, method='loose', _details=True)
-        self.assertEqual(d1.dict,
-                         {'TEST': {'OBJECT': 'TEST',
+##########################################################################################
+# Label inputs and the filepath attribute
+##########################################################################################
+
+QUB_FILE = TEST_FILE_DIR / 'v1877838443_1.qub'
+
+
+@pytest.fixture
+def qub_content():
+    return Pds3Label(QUB_FILE, method='strict').content
+
+
+def test_label_from_content_string(qub_content):
+    label = PdsLabel(qub_content, method='strict', types=True, sources=True)
+    assert label.dict == _answer('v1877838443_1-qub-answer.txt')
+
+
+def test_label_from_list_of_strings(qub_content):
+    label = PdsLabel(qub_content.split('\n'), method='strict', types=True, sources=True)
+    assert label.dict == _answer('v1877838443_1-qub-answer.txt')
+
+
+@pytest.mark.parametrize('path', [QUB_FILE, str(QUB_FILE), FCPath(QUB_FILE)])
+def test_filepath(path):
+
+    label = Pds3Label(path)
+    assert isinstance(label.filepath, FCPath)
+    assert label.filepath == FCPath(QUB_FILE)
+    assert label._filepath == label.filepath        # deprecated name
+
+
+def test_filepath_is_none_for_content(qub_content):
+
+    for label in (Pds3Label(qub_content), Pds3Label(qub_content.split('\n'))):
+        assert label.filepath is None
+        assert label._filepath is None
+
+
+def test_invalid_method():
+    with pytest.raises(ValueError, match='invalid method'):
+        PdsLabel(QUB_FILE, method='whatever')
+
+
+def test_invalid_label():
+    with pytest.raises(ValueError, match='invalid label'):
+        PdsLabel(999)
+
+
+def test_setitem(qub_content):
+
+    label = Pds3Label(qub_content)
+    label['FOO'] = 'BAR'
+    assert label.dict['FOO'] == 'BAR'
+
+
+##########################################################################################
+# Syntax errors
+##########################################################################################
+
+@pytest.mark.parametrize('vax', [False, True])
+def test_missing_end_statement(vax):
+    with pytest.raises(PdsSyntaxError, match=r'missing END statement in .*empty\.dat'):
+        Pds3Label(TEST_FILE_DIR / 'empty.dat', vax=vax)
+
+
+def test_syntax_error_classes():
+
+    assert issubclass(PdsSyntaxError, SyntaxError)
+    assert issubclass(PdsSyntaxError, PdsError)
+
+    with pytest.raises(SyntaxError):
+        Pds3Label(TEST_FILE_DIR / 'empty.dat')
+    with pytest.raises(PdsError):
+        Pds3Label(TEST_FILE_DIR / 'empty.dat')
+
+
+def test_mixed_units_fast():
+
+    content = 'VECTOR = (1 <km>, 10 <s>)\nEND\n'
+    Pds3Label(content)          # no problem if method='strict'
+    with pytest.raises(PdsSyntaxError,
+                       match=r'mixture of units encountered at VECTOR, .*'):
+        Pds3Label(content, method='fast')
+
+
+@pytest.mark.parametrize('method', ['strict', 'loose', 'fast'])
+@pytest.mark.parametrize(('content', 'message'), [
+    ('OBJECT = FOO\nEND\n', r'missing END_OBJECT.*'),
+    ('OBJECT = FOO\nEND_OBJECT = BAR\nEND\n', r'unbalanced END_OBJECT = BAR.*'),
+    ('END_OBJECT = BAR\nEND\n', r'unbalanced END_OBJECT = BAR.*'),
+    ('VALUE = "abc\nEND\n', r'Expected \'"\', found end of text.*'),
+])
+def test_syntax_error(method, content, message):
+    with pytest.raises(PdsSyntaxError, match=message):
+        Pds3Label(content, method=method)
+
+
+def test_end_object_without_value_strict():
+    with pytest.raises(PdsSyntaxError, match=r"found '\\n' .*"):
+        Pds3Label('END_OBJECT\nEND\n', method='strict')
+
+
+@pytest.mark.parametrize('method', ['loose', 'fast'])
+def test_end_object_without_value_unbalanced(method):
+    with pytest.raises(PdsSyntaxError, match=r'unbalanced END_OBJECT[^=]*'):
+        Pds3Label('END_OBJECT\nEND\n', method=method)
+
+
+@pytest.mark.parametrize(('content', 'message'), [
+    ('VALUE = (1,2\nEND\n', r'unbalanced parentheses \(\)'),
+    ('VALUE = {1,2\nEND\n', 'unbalanced braces {}'),
+    ('VALUE\nEND\n', 'missing "=" at VALUE, line 1'),
+])
+def test_syntax_error_fast(content, message):
+    with pytest.raises(PdsSyntaxError, match=message):
+        Pds3Label(content, method='fast')
+
+
+##########################################################################################
+# Special cases of label content
+##########################################################################################
+
+def test_details_from_content():
+
+    content = 'OBJECT = TEST\nVALUE = 7\nEND_OBJECT\nEND\n'
+    label = Pds3Label(content, method='loose', _details=True)
+    assert label.dict == {'TEST': {'OBJECT': 'TEST',
                                    'OBJECT_detail': _Text('', 0, ['TEST']),
                                    'VALUE': 7,
                                    'VALUE_detail': _Integer('', 0, ['7']),
                                    'END_OBJECT': 'TEST'},
                           'END': None,
-                          'objects': ['TEST']})
+                          'objects': ['TEST']}
 
-        # END with no terminator
-        content = 'VALUE = 7\nEND'
-        d1 = Pds3Label(content, method='loose')
-        self.assertEqual(d1.dict, {'VALUE': 7, 'END': None})
 
-        content = 'VALUE = 7\nEND    \t  '
-        d1 = Pds3Label(content, method='loose')
-        self.assertEqual(d1.dict, {'VALUE': 7, 'END': None})
+@pytest.mark.parametrize('content', ['VALUE = 7\nEND', 'VALUE = 7\nEND    \t  '])
+def test_end_without_terminator(content):
+    label = Pds3Label(content, method='loose')
+    assert label.dict == {'VALUE': 7, 'END': None}
 
-        # Missing commas in a sequence or set
-        content = 'VALUE = (1, 2, 3 4)\n'
-        d1 = Pds3Label(content, method='loose')
-        self.assertEqual(d1.dict, {'VALUE': [1, 2, 3, 4]})
 
-        content = 'VALUE = {1, 2, 3 4 1}\n'
-        d1 = Pds3Label(content, method='loose')
-        self.assertEqual(d1.dict, {'VALUE': {1, 2, 3, 4},
-                                   'VALUE_list': [1, 2, 3, 4, 1]})
+@pytest.mark.parametrize(('content', 'expected'), [
+    ('VALUE = (1, 2, 3 4)\n', {'VALUE': [1, 2, 3, 4]}),
+    ('VALUE = {1, 2, 3 4 1}\n', {'VALUE': {1, 2, 3, 4}, 'VALUE_list': [1, 2, 3, 4, 1]}),
+    ('VALUE = ((1, 2) (3\n "four"))\n', {'VALUE': [[1, 2], [3, "four"]]}),
+])
+def test_missing_commas(content, expected):
+    label = Pds3Label(content, method='loose')
+    assert label.dict == expected
 
-        content = 'VALUE = ((1, 2) (3\n "four"))\n'
-        d1 = Pds3Label(content, method='loose')
-        self.assertEqual(d1.dict, {'VALUE': [[1, 2], [3, "four"]]})
 
-        # Times with embedded blanks where zeros belong
-        for method in ('fast', 'loose'):
-            for q in ('', '"'):
-                for date1 in ('2001- 2- 3', '2004-05- 6', '2007- 8-09',
-                              '2010-  3', '2014- 56'):
-                    date2 = date1.replace(' ', '0')
-                    d1 = Pds3Label(f'DATE = {q}{date1}{q}\n', method=method)
-                    d2 = Pds3Label(f'DATE = {q}{date2}{q}\n', method=method)
-                    self.assertEqual(d1.dict, d2.dict)
-                    self.assertEqual(d1.dict['DATE_fmt'], date2)
+##########################################################################################
+# Dates and times with blanks where zeros belong
+##########################################################################################
 
-                    for hh in (' 6', '07'):
-                        for mm in ('08', ' 9'):
-                            time1 = f'{hh}:{mm}'
-                            time2 = time1.replace(' ', '0')
-                            if time2[1] == ':':
-                                time2 = '0' + time2
-                            d1 = Pds3Label(f'TIME = {q}{time1}{q}\n', method=method)
-                            d2 = Pds3Label(f'TIME = {q}{time2}{q}\n', method=method)
-                            self.assertEqual(d1.dict, d2.dict)
-                            self.assertEqual(d1.dict['TIME_fmt'], time2 + ':00')
+BLANK_DATES = ['2001- 2- 3', '2004-05- 6', '2007- 8-09', '2010-  3', '2014- 56']
+BLANK_HOURS = [' 6', '07']
+BLANK_MINUTES = ['08', ' 9']
+BLANK_SECONDS = [' 1', '02', ' 5.678']
+BLANK_ZONES = ['-2', '+ 3', '-4: 0', '+05: 0']
+BLANK_ZONED_TIMES = [' 2:34:56', ' 2: 3: 4', '12:34: 5.67']
 
-                            dt1 = date1 + 'T' + time1
-                            dt2 = date2 + 'T' + time2
-                            d1 = Pds3Label(f'DATE = {q}{dt1}{q}\n', method=method)
-                            d2 = Pds3Label(f'DATE = {q}{dt2}{q}\n', method=method)
-                            self.assertEqual(d1.dict, d2.dict)
-                            self.assertEqual(d1.dict['DATE_fmt'], dt2 + ':00')
+methods = pytest.mark.parametrize('method', ['fast', 'loose'])
+quotes = pytest.mark.parametrize('quote', ['', '"'], ids=['unquoted', 'quoted'])
 
-                            for ss in (' 1', '02', ' 5.678'):
-                                time1 = f'{hh}:{mm}:{ss}'
-                                time2 = time1.replace(' ', '0')
-                                d1 = Pds3Label(f'TIME = {q}{time1}{q}\n', method=method)
-                                d2 = Pds3Label(f'TIME = {q}{time2}{q}\n', method=method)
-                                self.assertEqual(d1.dict, d2.dict)
-                                self.assertEqual(d1.dict['TIME_fmt'], time2)
 
-                                dt1 = date1 + 'T' + time1
-                                dt2 = date2 + 'T' + time2
-                                d1 = Pds3Label(f'DATE = {q}{dt1}{q}\n', method=method)
-                                d2 = Pds3Label(f'DATE = {q}{dt2}{q}\n', method=method)
-                                self.assertEqual(d1.dict, d2.dict)
-                                self.assertEqual(d1.dict['DATE_fmt'], dt2)
+def _assert_same_label(name, value1, value2, quote, method):
+    """Parse NAME = value1 and NAME = value2 and confirm the dicts are equal.
 
-        method = 'loose'
-        for q in ('', '"'):
-            for tz in ('-2', '+ 3', '-4: 0', '+05: 0'):
-                for hms in (' 2:34:56', ' 2: 3: 4', '12:34: 5.67'):
-                    time1 = f'{hms}{tz}'
-                    time2 = time1.replace(' ', '0')
-                    d1 = Pds3Label(f'TIME = {q}{time1}{q}\n', method=method)
-                    d2 = Pds3Label(f'TIME = {q}{time2}{q}\n', method=method)
-                    self.assertEqual(d1.dict, d2.dict)
+    Returns the first label's dictionary.
+    """
 
-                    dt1 = '2012-01-23T' + time1
-                    dt2 = '2012-01-23T' + time2
-                    d1 = Pds3Label(f'DATE = {q}{dt1}{q}\n', method=method)
-                    d2 = Pds3Label(f'DATE = {q}{dt2}{q}\n', method=method)
-                    self.assertEqual(d1.dict, d2.dict)
+    d1 = Pds3Label(f'{name} = {quote}{value1}{quote}\n', method=method).dict
+    d2 = Pds3Label(f'{name} = {quote}{value2}{quote}\n', method=method).dict
+    assert d1 == d2
+    return d1
 
-    def test_as_dict(self):
 
-        self.maxDiff = MAXDIFF
+def _hm(hh, mm):
+    """Time strings HH:MM with and without blanks for zeros."""
 
-        root = 'AS_DICT_TEST'
-        filepath = TEST_FILE_DIR / (root + '.LBL')
-        d1 = Pds3Label(filepath)
-        test_dict = d1.as_dict()
+    time1 = f'{hh}:{mm}'
+    time2 = time1.replace(' ', '0')
+    return time1, time2
 
-        # This is the result of a run of the v1 module...
-        old_answer = (TEST_FILE_DIR / (root + '-as_dict.txt')).read_text()
-        old_answer_dict = eval(old_answer)
 
-        # new parser does not use "Z" suffix
-        test_dict['IMAGE_TIME'] = test_dict['IMAGE_TIME'] + 'Z'
+@methods
+@quotes
+@pytest.mark.parametrize('date', BLANK_DATES)
+def test_blank_date(method, quote, date):
+    fixed = date.replace(' ', '0')
+    d1 = _assert_same_label('DATE', date, fixed, quote, method)
+    assert d1['DATE_fmt'] == fixed
 
-        # a line break in an embedded string is now just a space
-        test_dict['SOURCE_PRODUCT_ID'][4] = (test_dict['SOURCE_PRODUCT_ID'][4]
-                                             .replace(' ', '\n'))
 
-        # old dicts do not have OBJECT and END_OBJECT entries
-        for key in ('IMAGE_HEADER', 'TELEMETRY_TABLE', 'BAD_DATA_VALUES_HEADER', 'IMAGE'):
-            del test_dict[key]['OBJECT']
-            del test_dict[key]['END_OBJECT']
+@methods
+@quotes
+@pytest.mark.parametrize('hh', BLANK_HOURS)
+@pytest.mark.parametrize('mm', BLANK_MINUTES)
+def test_blank_hm_time(method, quote, hh, mm):
+    time1, time2 = _hm(hh, mm)
+    d1 = _assert_same_label('TIME', time1, time2, quote, method)
+    assert d1['TIME_fmt'] == time2 + ':00'
 
-        # old dicts do not contain END statement
-        del test_dict['END']
 
-        self.assertEqual(test_dict, old_answer_dict)
+@methods
+@quotes
+@pytest.mark.parametrize('hh', BLANK_HOURS)
+@pytest.mark.parametrize('mm', BLANK_MINUTES)
+@pytest.mark.parametrize('ss', BLANK_SECONDS)
+def test_blank_hms_time(method, quote, hh, mm, ss):
+    time1, time2 = _hm(hh, mm)
+    time1, time2 = f'{time1}:{ss}', f'{time2}:{ss.replace(" ", "0")}'
+    d1 = _assert_same_label('TIME', time1, time2, quote, method)
+    assert d1['TIME_fmt'] == time2
+
+
+@methods
+@quotes
+@pytest.mark.parametrize('date', BLANK_DATES)
+@pytest.mark.parametrize('hh', BLANK_HOURS)
+@pytest.mark.parametrize('mm', BLANK_MINUTES)
+def test_blank_hm_date_time(method, quote, date, hh, mm):
+    time1, time2 = _hm(hh, mm)
+    dt1 = f'{date}T{time1}'
+    dt2 = f'{date.replace(" ", "0")}T{time2}'
+    d1 = _assert_same_label('DATE', dt1, dt2, quote, method)
+    assert d1['DATE_fmt'] == dt2 + ':00'
+
+
+@methods
+@quotes
+@pytest.mark.parametrize('date', BLANK_DATES)
+@pytest.mark.parametrize('hh', BLANK_HOURS)
+@pytest.mark.parametrize('mm', BLANK_MINUTES)
+@pytest.mark.parametrize('ss', BLANK_SECONDS)
+def test_blank_hms_date_time(method, quote, date, hh, mm, ss):
+    time1, time2 = _hm(hh, mm)
+    dt1 = f'{date}T{time1}:{ss}'
+    dt2 = f'{date.replace(" ", "0")}T{time2}:{ss.replace(" ", "0")}'
+    d1 = _assert_same_label('DATE', dt1, dt2, quote, method)
+    assert d1['DATE_fmt'] == dt2
+
+
+# Time zones are only supported by method='loose'
+@quotes
+@pytest.mark.parametrize('zone', BLANK_ZONES)
+@pytest.mark.parametrize('hms', BLANK_ZONED_TIMES)
+def test_blank_zoned_time(quote, zone, hms):
+
+    time1 = hms + zone
+    time2 = time1.replace(' ', '0')
+    _assert_same_label('TIME', time1, time2, quote, 'loose')
+    _assert_same_label('DATE', '2012-01-23T' + time1, '2012-01-23T' + time2, quote,
+                       'loose')
+
+
+##########################################################################################
+# as_dict
+##########################################################################################
+
+def test_as_dict():
+
+    test_dict = Pds3Label(TEST_FILE_DIR / 'AS_DICT_TEST.LBL').as_dict()
+
+    # This is the result of a run of the v1 module...
+    old_answer = _answer('AS_DICT_TEST-as_dict.txt')
+
+    # new parser does not use "Z" suffix
+    test_dict['IMAGE_TIME'] = test_dict['IMAGE_TIME'] + 'Z'
+
+    # a line break in an embedded string is now just a space
+    product_ids = test_dict['SOURCE_PRODUCT_ID']
+    product_ids[4] = product_ids[4].replace(' ', '\n')
+
+    # old dicts do not have OBJECT and END_OBJECT entries
+    for key in ('IMAGE_HEADER', 'TELEMETRY_TABLE', 'BAD_DATA_VALUES_HEADER', 'IMAGE'):
+        del test_dict[key]['OBJECT']
+        del test_dict[key]['END_OBJECT']
+
+    # old dicts do not contain END statement
+    del test_dict['END']
+
+    assert test_dict == old_answer
 
 
 ##########################################################################################

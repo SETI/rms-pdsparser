@@ -1,7 +1,7 @@
 # Ruff is the linter of record for everything it implements; see [tool.ruff] in
 # pyproject.toml. Ruff has no rule in the E121-E133 range, so the
 # continuation-line indent checks come from flake8, and CI and
-# scripts/run-all-checks.sh read the per-file-ignores below when they run
+# scripts/run-all-checks.sh read this file when they run
 # `flake8 --select=E12,E13`. For every other code, this file is for anyone
 # running flake8 by hand and is not authoritative.
 [flake8]
@@ -11,13 +11,6 @@ extend-ignore =
     # E305 Expected 2 blank lines after end of function or class
     E302, E305
 
-per-file-ignores =
-    # E127 Continuation line over-indented for visual indent
-    # E128 Continuation line under-indented for visual indent
-    # E221 Multiple spaces before operator
-    tests/test_utils.py: E128, E221
-    tests/test_PDS3_GRAMMAR.py: E127, E128
-    tests/test_labels.py: E128
 # E111 Indentation is not a multiple of four
 # E114 Indentation is not a multiple of four (comment)
 # E115 Expected an indented block (comment)

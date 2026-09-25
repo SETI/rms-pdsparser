@@ -138,11 +138,7 @@ extend-ignore = ["PT011", "SIM105", "SIM108", "I001", "N999", "RUF005", "RUF022"
 [tool.ruff.lint.per-file-ignores]
 # E501: test files are exempt from the line length limit so that expected-value
 #   tables can stay aligned and readable.
-# PT009, PT027: the tests are written with unittest.TestCase, so they use its
-#   assertion methods rather than bare assert and pytest.raises.
-# N801, N802: test classes and methods are named after the classes and functions
-#   they test (Test_labels, test_PDS3_LABEL, ...).
-"tests/*" = ["E501", "PT009", "PT027", "N801", "N802"]
+"tests/*" = ["E501"]
 
 # B006: the list defaults of fmt_dirs and repairs are part of the documented API
 #   and are never mutated.
