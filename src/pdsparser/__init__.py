@@ -265,6 +265,9 @@ from ._utils import (expand_structures, is_pds3_file, read_label, read_vax_binar
                      PdsError, PdsSyntaxError, _unique_key)
 from ._PDS3_GRAMMAR import _PDS3_LABEL, _ALT_PDS3_LABEL, _COMPOUND_LABEL
 
+__all__ = ['expand_structures', 'is_pds3_file', 'read_label', 'read_vax_binary_label',
+           'PdsError', 'PdsSyntaxError', 'Pds3Label', 'PdsLabel']
+
 _PARSERS = {'strict': _PDS3_LABEL, 'loose': _ALT_PDS3_LABEL, 'compound': _COMPOUND_LABEL}
 
 ##########################################################################################
@@ -736,8 +739,5 @@ class Pds3Label:
 
 # Deprecated name for the class
 PdsLabel = Pds3Label
-
-__all__ = ['expand_structures', 'is_pds3_file', 'read_label', 'read_vax_binary_label',
-           'Pds3Label', 'PdsLabel', 'PdsError', 'PdsSyntaxError']
 
 ##########################################################################################
