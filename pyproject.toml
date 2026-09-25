@@ -61,6 +61,11 @@ filterwarnings = [
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+# PEP 561 marker and type stub must be shipped in the wheel, or downstream type
+# checkers ignore them.
+pdsparser = ["py.typed", "*.pyi"]
+
 [tool.setuptools_scm]
 local_scheme = "no-local-version"
 write_to = "src/pdsparser/_version.py"
