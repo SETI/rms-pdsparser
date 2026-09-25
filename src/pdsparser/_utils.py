@@ -7,11 +7,21 @@ import re
 from filecache import FCPath
 
 
+class PdsError(Exception):
+    """Generic PDS label error."""
+    pass
+
+
+class PdsSyntaxError(SyntaxError, PdsError):
+    """PDS label syntax error."""
+    pass
+
+
 def read_label(filepath, *, chars=4000):
     """Read the PDS3 label from a file. Supports attached labels within binary files.
 
     Parameters:
-        filepath (str, pathlib.Path, or filecache.FCPath): The path to the file. If the
+        filepath (str | Path | FCPath): The path to the file. If the
             file does not contain a PDS3 label, a detached label (with the same path but
             ending in ".lbl" or ".LBL") is read instead.
         chars (int, optional): Initial number of characters to read from the top of a
@@ -23,7 +33,7 @@ def read_label(filepath, *, chars=4000):
 
     Raises:
         FileNotFoundError: If the label file is missing.
-        SyntaxError: If the END statement is not found in a binary file.
+        PdsSyntaxError: If the END statement is not found in a binary file.
 
     Notes:
         If the `filepath` ends in ".lbl" or ".LBL", it is assumed to refer to a detached
@@ -83,7 +93,7 @@ def read_label(filepath, *, chars=4000):
         if alt_filepath.exists():
             return read_label(alt_filepath)
 
-    raise SyntaxError(f'missing END statement in {filepath}')
+    raise PdsSyntaxError(f'missing END statement in {filepath}')
 
 
 def read_vax_binary_label(filepath):
@@ -91,7 +101,7 @@ def read_vax_binary_label(filepath):
     records.
 
     Parameters:
-        filepath (str, pathlib.Path, or filecache.FCPath): The path to the file. A
+        filepath (str | Path | FCPath): The path to the file. A
             detached label (ending in ".lbl" or ".LBL") is read using "stream" format;
             any other file is read assuming Vax variable-length format (in which the first
             two bytes of each record contain the length of the remaining
@@ -103,6 +113,7 @@ def read_vax_binary_label(filepath):
 
     Raises:
         FileNotFoundError: If the label file is missing.
+        PdsSyntaxError: If the END statement is not found.
     """
 
     filepath = FCPath(filepath)
@@ -135,7 +146,7 @@ def read_vax_binary_label(filepath):
         if alt_filepath.exists():
             return read_label(alt_filepath)
 
-    raise SyntaxError(f'missing END statement in {filepath}')
+    raise PdsSyntaxError(f'missing END statement in {filepath}')
 
 
 def expand_structures(content, fmt_dirs=[], *, repairs=[], label_path=None):
@@ -143,14 +154,14 @@ def expand_structures(content, fmt_dirs=[], *, repairs=[], label_path=None):
     ".FMT" files.
 
     Parameters:
-        fmt_dirs (str, pathlib.Path, filecache.FCPath, or list, optional):
+        fmt_dirs (str | Path | FCPath | list[str | Path | FCPath], optional):
             One or more directory paths to search for the ".FMT" files.
-        repairs (tuple or list[tuple]):
+        repairs (tuple[str, str] | list[tuple[str, str]], optional):
             One or more two-element tuples of the form (pattern, replacement), where the
             first item is a regular expression and the second is the string with which to
             replace it. These repair patterns are applied to the label content before it
             is parsed, and make it possible to repair known syntax errors.
-        label_path (str, pathlib.Path, filecache.FCPath, optional):
+        label_path (str | Path | FCPath, optional):
             The path to the label file from which the content was obtained; if provided,
             the parent directory of this files is the first to be searched for .FMT files.
 
@@ -169,7 +180,7 @@ def expand_structures(content, fmt_dirs=[], *, repairs=[], label_path=None):
     # Obtain the list of directories to search
     if not isinstance(fmt_dirs, (list, tuple)):
         fmt_dirs = [fmt_dirs]
-    fmt_dirs = [FCPath(dir) for dir in fmt_dirs]
+    fmt_dirs = [FCPath(fmt_dir) for fmt_dir in fmt_dirs]
     if label_path:
         fmt_dirs = [FCPath(label_path).parent] + fmt_dirs
     if not fmt_dirs:        # if no path is provided, search the local default dir
@@ -205,6 +216,20 @@ def expand_structures(content, fmt_dirs=[], *, repairs=[], label_path=None):
         content = content[:k0] + fmt_content + content[k1:]
 
     return content
+
+
+def is_pds3_file(filepath):
+    """True if this file appears to contain a PDS3 label, either attached or detached.
+
+    Raises:
+        OSError: If the file cannot be read, e.g., because it is missing
+            (FileNotFoundError) or is a directory.
+    """
+
+    filepath = FCPath(filepath)
+    with filepath.open(mode='rb') as f:
+        text = f.read(300)
+    return (b'PDS_VERSION_ID' in text or b'SFDU_LABEL' in text)
 
 
 def _format_float(value):
@@ -311,9 +336,7 @@ def _unwrap(text):
     for part in parts[1:]:
         if not part:
             new_parts.append('\n\n')
-        elif part[0].isspace():
-            new_parts.append(part)
-        elif new_parts[-1][-1].isspace():
+        elif part[0].isspace() or new_parts[-1][-1].isspace():
             new_parts.append(part)
         else:
             new_parts.append(' ' + part)

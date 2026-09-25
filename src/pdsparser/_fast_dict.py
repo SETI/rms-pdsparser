@@ -7,7 +7,8 @@ import julian
 import numbers
 import re
 
-from .utils import _based_int, _is_identifier, _format_float, _unique_key, _unwrap
+from ._utils import (_based_int, _is_identifier, _format_float, _unique_key, _unwrap,
+                     PdsSyntaxError)
 
 _UNITS = re.compile(r' *(<.*?>)')
 _BASED_INT = re.compile(r'(\d+)#(\w+)#')
@@ -84,11 +85,11 @@ def _clean_lines(lines):
         prefix = ''
 
     if parens:
-        raise SyntaxError('unbalanced parentheses ()')
+        raise PdsSyntaxError('unbalanced parentheses ()')
     if braces:
-        raise SyntaxError('unbalanced braces {}')
+        raise PdsSyntaxError('unbalanced braces {}')
     if prefix:
-        raise SyntaxError(f'Expected \'"\', found end of text at line {recno+1}')
+        raise PdsSyntaxError(f'Expected \'"\', found end of text at line {recno+1}')
 
     return cleaned
 
@@ -192,8 +193,8 @@ def _evaluate(value, recno, name):
         parts[1::2] = [' ' + part for part in parts[1::2]]
         info['source'] = ''.join(parts)
     elif len(unique_units) > 1:
-        raise SyntaxError(f'mixture of units encountered at {name}, line {recno}: '
-                          f'{unique_units}')
+        raise PdsSyntaxError(f'mixture of units encountered at {name}, line {recno}: '
+                             f'{unique_units}')
 
     # Handle a sequence or set
     if source[0] in '({':
@@ -306,7 +307,7 @@ def _to_dict(lines, types=False, sources=False, first_suffix=True):
                             group_keys[-1][group_keys[-1].index(key)] = key + '_1'
                         continue
                     remainder = key[len(dup):]
-                    if not remainder == remainder.lower():
+                    if remainder != remainder.lower():
                         continue
                     if remainder[1:2].isdigit():
                         continue
@@ -338,7 +339,7 @@ def _to_dict(lines, types=False, sources=False, first_suffix=True):
         # Get the name and value
         (name, equal, value) = line.partition('=')
         if not equal and name not in {'END_OBJECT', 'END_GROUP'}:
-            raise SyntaxError(f'missing "=" at {name}, line {recno}')
+            raise PdsSyntaxError(f'missing "=" at {name}, line {recno}')
 
         name = name.strip()
         value, info = _evaluate(value, recno, name)
@@ -362,9 +363,9 @@ def _to_dict(lines, types=False, sources=False, first_suffix=True):
             (obj_type, obj_name, obj_dict, dups) = state.pop()
             if obj_type != name[4:] or (value and value != obj_name):
                 if value:
-                    raise SyntaxError(f'unbalanced {name} = {value} at line {recno}')
+                    raise PdsSyntaxError(f'unbalanced {name} = {value} at line {recno}')
                 else:
-                    raise SyntaxError(f'unbalanced {name} at line {recno}')
+                    raise PdsSyntaxError(f'unbalanced {name} at line {recno}')
             if not value:       # tolerate END_OBJECT or END_GROUP without name
                 key = name[4:]
                 obj_dict[name] = obj_dict[key]
@@ -415,7 +416,7 @@ def _to_dict(lines, types=False, sources=False, first_suffix=True):
     # Make sure all objects and groups were terminated
     (obj_type, obj_name, obj_dict, dups) = state.pop()
     if len(state) > 0:
-        raise SyntaxError(f'missing END_{obj_type} = {obj_name}')
+        raise PdsSyntaxError(f'missing END_{obj_type} = {obj_name}')
 
     obj_dict['END'] = None
     if object_keys[-1]:

@@ -7,13 +7,16 @@ name = "rms-pdsparser"
 dynamic = ["version"]
 description = "Routines for parsing PDS3 labels"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.11"
 dependencies = [
   "pyparsing",
   "rms-filecache",
   "rms-julian"
 ]
 license = {text = "Apache-2.0"}
+authors = [
+  {name = "Mark Showalter", email = "mshowalter@seti.org"}
+]
 maintainers = [
   {name = "Robert S. French", email = "rfrench@seti.org"}
 ]
@@ -26,8 +29,6 @@ classifiers = [
   "Topic :: Software Development :: Libraries :: Python Modules",
   "Topic :: Utilities",
   "License :: OSI Approved :: Apache Software License",
-  "Programming Language :: Python :: 3.9",
-  "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
@@ -38,13 +39,140 @@ classifiers = [
 
 [project.urls]
 Homepage = "https://github.com/SETI/rms-pdsparser"
+Documentation = "https://rms-pdsparser.readthedocs.io/en/latest"
 Repository = "https://github.com/SETI/rms-pdsparser"
 Source = "https://github.com/SETI/rms-pdsparser"
 Issues = "https://github.com/SETI/rms-pdsparser/issues"
 
+[tool.pytest.ini_options]
+pythonpath = [
+  "src"
+]
+testpaths = ["tests"]
+addopts = ["-n", "auto", "--cov=src/pdsparser", "--strict-markers", "--strict-config"]
+markers = []
+filterwarnings = [
+  "error",
+  # python-dateutil, imported by rms-julian, calls utcfromtimestamp() at import time
+  "ignore:datetime.datetime.utcfromtimestamp:DeprecationWarning:dateutil.*",
+]
+
 [tool.setuptools]
-packages = ["pdsparser"]
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+# PEP 561 marker and type stub must be shipped in the wheel, or downstream type
+# checkers ignore them.
+pdsparser = ["py.typed", "*.pyi"]
 
 [tool.setuptools_scm]
 local_scheme = "no-local-version"
-write_to = "pdsparser/_version.py"
+write_to = "src/pdsparser/_version.py"
+
+[project.optional-dependencies]
+dev = [
+  "coverage>=7.0",
+  "flake8",
+  "pip-audit>=2.7",
+  "pymarkdownlnt>=0.9.35",
+  "pytest>=7.0",
+  "pytest-cov>=4.0",
+  "pytest-xdist>=3.8.0",
+  "ruff>=0.8",
+  # "bandit[toml]>=1.8",
+  "pyroma>=4.2",
+  # "vulture>=2.14",
+  "rms-pdsparser[docs]",
+]
+docs = [
+  "myst-parser",
+  "sphinx",
+  "sphinx-rtd-theme",
+]
+
+# Tool configuration
+
+[tool.coverage.run]
+branch = true
+parallel = true
+# Must match --cov in the pytest addopts above, or fail_under measures something else
+source = ["src/pdsparser"]
+omit = ["tests/*", "_version.py"]
+
+[tool.coverage.report]
+exclude_lines = [
+  "pragma: no cover",
+  "def __repr__",
+  "raise NotImplementedError",
+]
+fail_under = 90
+
+[tool.ruff]
+target-version = "py311"
+# Must match max-line-length in .flake8.
+line-length = 90
+exclude = [
+]
+
+[tool.ruff.format]
+quote-style = "single"
+
+[tool.ruff.lint]
+# Explicit rule set (recommended for library projects). Categories:
+# E, W = pycodestyle errors/warnings; F = Pyflakes; I = isort; UP = pyupgrade;
+# B = bugbear; SIM = simplify; C4 = comprehensions; A = builtins (no shadowing);
+# N = pep8-naming; PT = pytest-style; RUF = Ruff-specific (e.g. unused noqa).
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "C4", "A", "N", "PT", "RUF"]
+# PT011 - pytest.raises is too broad.
+# SIM105 - Use contextlib.suppress for suppressions.
+# SIM108 - Use ternary operator for simple if/else.
+# I001 - Import sorting.
+# N999 - Invalid module name. _PDS3_GRAMMAR.py and test_PDS3_GRAMMAR.py are named for
+#   the grammar they implement and test.
+# RUF005 - Collection literal concatenation. `suffixes + ('unit',)` reads as clearly
+#   as the unpacking form the rule proposes.
+# RUF022 - Unsorted __all__. The order of __all__ is deliberate.
+extend-ignore = ["PT011", "SIM105", "SIM108", "I001", "N999", "RUF005", "RUF022"]
+
+[tool.ruff.lint.per-file-ignores]
+# E501: test files are exempt from the line length limit so that expected-value
+#   tables can stay aligned and readable.
+"tests/*" = ["E501"]
+
+# B006: the list defaults of fmt_dirs and repairs are part of the documented API
+#   and are never mutated.
+# N806: compiled regular expressions keep constant-style names even when they are
+#   local to a function.
+"src/pdsparser/__init__.py" = ["B006"]
+"src/pdsparser/_utils.py" = ["B006", "N806"]
+
+[tool.pymarkdown.plugins.md013]
+# Line length (disable so README/CONTRIBUTING can use longer lines).
+enabled = false
+
+[tool.pymarkdown.plugins.md033]
+# Inline HTML (e.g. <br>) allowed in Markdown.
+enabled = false
+
+[tool.pymarkdown.plugins.md025]
+# Multiple top-level headings. The README uses a level-one heading per major
+# section, and those levels feed the Sphinx TOC through the include in
+# docs/index.rst, so they are deliberate.
+enabled = false
+
+[tool.pymarkdown.plugins.md041]
+# First line must be a top-level heading. The README opens with badges; the
+# Sphinx include starts after the <!-- start-after-point --> marker instead.
+enabled = false
+
+# Uncomment when enabling bandit in [project.optional-dependencies].dev.
+# [tool.bandit]
+# exclude_dirs = ["tests", "venv", ".venv"]
+# targets = ["src"]
+
+# Uncomment when enabling vulture in [project.optional-dependencies].dev.
+# [tool.vulture]
+# paths = ["src"]
+# exclude = ["tests/"]
+# min_confidence = 70
