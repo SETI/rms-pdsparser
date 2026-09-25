@@ -219,7 +219,12 @@ def expand_structures(content, fmt_dirs=[], *, repairs=[], label_path=None):
 
 
 def is_pds3_file(filepath):
-    """True if this file appears to contain a PDS3 label, either attached or detached."""
+    """True if this file appears to contain a PDS3 label, either attached or detached.
+
+    Raises:
+        OSError: If the file cannot be read, e.g., because it is missing
+            (FileNotFoundError) or is a directory.
+    """
 
     filepath = FCPath(filepath)
     with filepath.open(mode='rb') as f:
