@@ -19,8 +19,8 @@ from filecache import FCPath
 
 __version__: str
 
-__all__ = ['expand_structures', 'is_pds3_file', 'read_label', 'read_vax_binary_label',
-           'PdsError', 'PdsSyntaxError', 'Pds3Label', 'PdsLabel']
+__all__ = ['expand_structures', 'is_pds3_file', 'is_pds3_vax_file', 'read_label',
+           'read_vax_binary_label', 'PdsError', 'PdsSyntaxError', 'Pds3Label', 'PdsLabel']
 
 _FilePath: TypeAlias = str | Path | FCPath
 _Repairs: TypeAlias = tuple[str, str] | list[tuple[str, str]]
@@ -31,6 +31,7 @@ def expand_structures(content: str, fmt_dirs: _FilePath | list[_FilePath] = ...,
                       repairs: _Repairs = ...,
                       label_path: _FilePath | None = None) -> str: ...
 def is_pds3_file(filepath: _FilePath) -> bool: ...
+def is_pds3_vax_file(filepath: _FilePath) -> bool: ...
 
 class PdsError(Exception): ...
 class PdsSyntaxError(SyntaxError, PdsError): ...

@@ -17,6 +17,13 @@ class PdsSyntaxError(SyntaxError, PdsError):
     pass
 
 
+# Define regular expressions for label
+_COMMENT = re.compile(rb'(/\*.*?)\n')
+_DOUBLE = re.compile(rb'(".*?")')
+_SINGLE = re.compile(rb"('.*?')")
+_END = re.compile(rb'\n *END *\r?\n')
+
+
 def read_label(filepath, *, chars=4000):
     """Read the PDS3 label from a file. Supports attached labels within binary files.
 
@@ -45,15 +52,18 @@ def read_label(filepath, *, chars=4000):
     if filepath.suffix.upper() == '.LBL':
         return filepath.read_text(encoding='latin-1')
 
-    # Define regular expressions for label
-    _COMMENT = re.compile(rb'(/\*.*?)\n')
-    _DOUBLE = re.compile(rb'(".*?")')
-    _SINGLE = re.compile(rb"('.*?')")
-    _END = re.compile(rb'\n *END *\r?\n')
-
     # Open file for read; treat it as binary
     with filepath.open(mode='rb') as f:         # pragma: no branch
-        content = b''
+
+        # If the second character is a null, it's a Vax variable-length record file
+        content = f.read(2)
+        if content[1:2] == b'\0':
+            f.seek(0)
+            content = _read_opened_vax_binary_label(f)
+            if content:
+                return content
+            return _try_reading_lbl_instead(filepath)
+
         end_of_file = False
         while not end_of_file:                  # pragma: no branch
 
@@ -87,7 +97,13 @@ def read_label(filepath, *, chars=4000):
             # If not found, read more content and try again
             chars *= 2
 
-    # Check for a detached .LBL file
+    # No END statement found; check for a detached .LBL file
+    return _try_reading_lbl_instead(filepath)
+
+
+def _try_reading_lbl_instead(filepath):
+    """Look for a detached LBL file if reading the given file failed."""
+
     for suffix in ('.lbl', '.LBL'):
         alt_filepath = filepath.with_suffix(suffix)
         if alt_filepath.exists():
@@ -101,12 +117,12 @@ def read_vax_binary_label(filepath):
     records.
 
     Parameters:
-        filepath (str | Path | FCPath): The path to the file. A
-            detached label (ending in ".lbl" or ".LBL") is read using "stream" format;
-            any other file is read assuming Vax variable-length format (in which the first
-            two bytes of each record contain the length of the remaining
-            record). If the file does not contain a PDS3 label, a detached label
-            (with same path but ending in ".lbl" or ".LBL") is read instead.
+        filepath (str | Path | FCPath): The path to the file. A detached label (ending in
+            ".lbl" or ".LBL") is read using "stream" format; any other file is read
+            assuming Vax variable-length format (in which the first two bytes of each
+            record contain the length of the remaining record). If the file does not
+            contain a PDS3 label, a detached label (with same path but ending in ".lbl" or
+            ".LBL") is read instead.
 
     Returns:
         str: The content of the label as a single string with newline terminators.
@@ -120,33 +136,48 @@ def read_vax_binary_label(filepath):
     if filepath.suffix.upper() == '.LBL':
         return read_label(filepath)
 
+    with filepath.open(mode='rb') as f:
+        content = _read_opened_vax_binary_label(f)
+
+    if content:
+        return content
+
+    # No END statement found; check for a detached .LBL file
+    return _try_reading_lbl_instead(filepath)
+
+
+def _read_opened_vax_binary_label(file):
+    """Read an opened Vax binary file that uses variable-length records.
+
+    Parameters:
+        file (io.BufferedReader): The file opened for binary read.
+
+    Returns:
+        str | None: The content of the label as a single string with newline terminators;
+        None if the file does not contain a PDS3 END statement.
+    """
+
     # Read from Vax-structured file (where first two bytes are the record length)
     ended = False
-    with filepath.open(mode='rb') as f:
-        recs = []
-        while True:
-            header = f.read(2)                   # read two bytes
-            if len(header) == 0:                 # at EOF, break
-                break
-            count = header[1] * 256 + header[0]  # interpret bytes as LSB integer
-            rec = f.read(count)                  # read record with this many bytes
-            recs.append(rec)                     # append this record to content
-            if rec.strip() == b'END':            # on "END", we're done
-                ended = True
-                break
-            if len(rec) % 2 == 1:                # if the record length is odd...
-                f.read(1)                        # ... skip the next byte
+    recs = []
+    while True:
+        header = file.read(2)                # read two bytes
+        if len(header) < 2:                  # at EOF, break
+            break
+        count = header[1] * 256 + header[0]  # interpret bytes as LSB integer
+        rec = file.read(count)               # read record with this many bytes
+        recs.append(rec)                     # append this record to content
+        if rec.strip() == b'END':            # on "END", we're done
+            ended = True
+            break
+        if len(rec) % 2 == 1:                # if the record length is odd...
+            file.read(1)                     # ... skip the next byte
 
     if ended:
         content = b'\n'.join(recs) + b'\n'
         return content.decode('latin-1')
 
-    for suffix in ('.lbl', '.LBL'):
-        alt_filepath = filepath.with_suffix(suffix)
-        if alt_filepath.exists():
-            return read_label(alt_filepath)
-
-    raise PdsSyntaxError(f'missing END statement in {filepath}')
+    return None
 
 
 def expand_structures(content, fmt_dirs=[], *, repairs=[], label_path=None):
@@ -230,6 +261,25 @@ def is_pds3_file(filepath):
     with filepath.open(mode='rb') as f:
         text = f.read(300)
     return (b'PDS_VERSION_ID' in text or b'SFDU_LABEL' in text)
+
+
+def is_pds3_vax_file(filepath):
+    """True if this is a PDS3-labeled file that uses Vax variable-length records.
+
+    The first two bytes of a Vax variable-length record file contain the LSB length of the
+    first record. Because a PDS record is never >= 256 bytes, this means that the second
+    byte of the file should be zero. This serves as an adequate test for one of these
+    files.
+
+    Raises:
+        OSError: If the file cannot be read, e.g., because it is missing
+            (FileNotFoundError) or is a directory.
+    """
+
+    filepath = FCPath(filepath)
+    with filepath.open(mode='rb') as f:
+        text = f.read(300)
+    return text[1:2] == b'\0' and (b'PDS_VERSION_ID' in text or b'SFDU_LABEL' in text)
 
 
 def _format_float(value):

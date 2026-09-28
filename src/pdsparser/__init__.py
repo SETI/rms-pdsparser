@@ -202,7 +202,6 @@ parse the label and present its content.
   dictionary using the keyword plus suffix "_source".
 * Use `expand=True` to insert the content of any referenced `^STRUCTURE` keywords into the
   returned dictionary.
-* Use `vax=True` to read attached labels from old-style Vax variable-length record files.
 * Use the `repairs` to correct any known syntax errors in the label prior to parsing using
   regular expressions.
 
@@ -239,14 +238,16 @@ Utilities
 
 The `pdsparser` module provides several additional utilities for handling PDS3 labels.
 
-- :func:`read_label`: Reads a PDS3 label from a file. Supports attached labels
-  within binary files.
-- :func:`read_vax_binary_label`: Reads the attached PDS3 label from an old-style
-  Vax binary file that uses variable-length records.
-- :func:`expand_structures`: Replaces any `^STRUCTURE` keywords in a label string
-  with the content of the associated ".FMT" files.
+- :func:`read_label`: Reads a PDS3 label from a file. Supports attached labels within
+  binary files.
+- :func:`read_vax_binary_label`: Reads the attached PDS3 label from an old-style Vax
+  binary file that uses variable-length records.
+- :func:`expand_structures`: Replaces any `^STRUCTURE` keywords in a label string with the
+  content of the associated ".FMT" files.
 - :func:`is_pds3_file`: Returns True if a file appears to contain a PDS3 label, either
   attached or detached.
+- :func:`is_pds3_vax_file`: Returns True if a file contains a PDS3 label and uses
+  old-style Vax variable-length records.
 """
 
 import datetime as dt
@@ -261,12 +262,12 @@ except ImportError:         # pragma: no cover
     __version__ = 'Version unspecified'
 
 from ._fast_dict import _fast_dict
-from ._utils import (expand_structures, is_pds3_file, read_label, read_vax_binary_label,
-                     PdsError, PdsSyntaxError, _unique_key)
+from ._utils import (expand_structures, is_pds3_file, is_pds3_vax_file, read_label,
+                     read_vax_binary_label, PdsError, PdsSyntaxError, _unique_key)
 from ._PDS3_GRAMMAR import _PDS3_LABEL, _ALT_PDS3_LABEL, _COMPOUND_LABEL
 
-__all__ = ['expand_structures', 'is_pds3_file', 'read_label', 'read_vax_binary_label',
-           'PdsError', 'PdsSyntaxError', 'Pds3Label', 'PdsLabel']
+__all__ = ['expand_structures', 'is_pds3_file', 'is_pds3_vax_file', 'read_label',
+           'read_vax_binary_label', 'PdsError', 'PdsSyntaxError', 'Pds3Label', 'PdsLabel']
 
 _PARSERS = {'strict': _PDS3_LABEL, 'loose': _ALT_PDS3_LABEL, 'compound': _COMPOUND_LABEL}
 
@@ -332,7 +333,9 @@ class Pds3Label:
                 expressions for more details.
 
             vax (bool, optional):
-                True to read an attached label from a Vax binary file.
+                True to read an attached label from a Vax binary, variable-length record
+                file. The file is now automatically checked for this format, so this
+                option is no longer strictly necessary.
 
             types (bool, optional):
                 If True, for each PDS keyword in the label, there will be an extra key in

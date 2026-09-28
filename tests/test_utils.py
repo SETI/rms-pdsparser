@@ -8,7 +8,7 @@ import pytest
 
 # Note: most functions in _utils.py are tested fully by test_labels.py.
 import pdsparser
-from pdsparser import is_pds3_file
+from pdsparser import is_pds3_file, is_pds3_vax_file
 from pdsparser._utils import _unwrap
 
 ROOT_DIR = pathlib.Path(__file__).parent.parent
@@ -39,6 +39,36 @@ def test_is_not_pds3_file(filename: str) -> None:
 def test_is_pds3_file_missing() -> None:
     with pytest.raises(FileNotFoundError):
         is_pds3_file(TEST_FILE_DIR / 'missing.lbl')
+
+
+##########################################################################################
+# is_pds3_vax_file
+##########################################################################################
+
+def test_is_pds3_vax_file() -> None:
+    assert is_pds3_vax_file(TEST_FILE_DIR / 'C3438954.IMQ')
+
+
+@pytest.mark.parametrize('filename', [
+    'v1877838443_1.lbl',    # detached label
+    'v1877838443_1.qub',    # attached label, stream format
+    'empty.dat',            # too short to test
+    'IRISHEDR.FMT',         # not a label
+])
+def test_is_not_pds3_vax_file(filename: str) -> None:
+    assert not is_pds3_vax_file(TEST_FILE_DIR / filename)
+
+
+def test_is_pds3_vax_file_without_label(tmp_path: pathlib.Path) -> None:
+    # A null second byte alone is not enough; the file must also contain a PDS3 label
+    filepath = tmp_path / 'data.IMG'
+    filepath.write_bytes(b'\x05\x00\x02\x00\x2c\x01\x07\x00')
+    assert not is_pds3_vax_file(filepath)
+
+
+def test_is_pds3_vax_file_missing() -> None:
+    with pytest.raises(FileNotFoundError):
+        is_pds3_vax_file(TEST_FILE_DIR / 'missing.IMQ')
 
 
 ##########################################################################################

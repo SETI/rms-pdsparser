@@ -270,6 +270,16 @@ def test_detached_label_fallback(vax: bool) -> None:
     assert label.dict == _answer('C3450702_GEOMED-answer.txt')
 
 
+def test_detached_label_fallback_from_partial_vax_record(tmp_path: pathlib.Path) -> None:
+
+    # The null second byte makes this look like a Vax file, but a single byte is left
+    # after the first record, too short to hold a record length; the detached label is
+    # read instead
+    (tmp_path / 'data.IMG').write_bytes(b'\x02\x00ab\x07')
+    (tmp_path / 'data.LBL').write_text('PDS_VERSION_ID = PDS3\nEND\n')
+    label = Pds3Label(tmp_path / 'data.IMG', method='strict')
+    assert label.dict == {'PDS_VERSION_ID': 'PDS3', 'END': None}
+
 
 ##########################################################################################
 # VG_0xxx: C3438954
@@ -291,24 +301,30 @@ def _remove_sources(answer: dict[str, Any]) -> dict[str, Any]:
     return answer
 
 
+# vax=False relies on the automatic recognition of the Vax format
+@pytest.mark.parametrize('vax', [False, True])
 @pytest.mark.parametrize('method', ['loose', 'fast'])
-def test_vg_vax(method: Method) -> None:
+def test_vg_vax(method: Method, vax: bool) -> None:
     label = Pds3Label(VG_IMQ, method=method, types=True, sources=True, expand=False,
-                      vax=True)
+                      vax=vax)
     assert label.dict == _answer('C3438954-answer.txt')
 
 
+# vax=False relies on the automatic recognition of the Vax format
+@pytest.mark.parametrize('vax', [False, True])
 @pytest.mark.parametrize('method', ['loose', 'fast'])
-def test_vg_vax_without_sources(method: Method) -> None:
+def test_vg_vax_without_sources(method: Method, vax: bool) -> None:
     label = Pds3Label(VG_IMQ, method=method, types=True, sources=False, expand=False,
-                      vax=True)
+                      vax=vax)
     assert label.dict == _remove_sources(_answer('C3438954-answer.txt'))
 
 
+# vax=False relies on the automatic recognition of the Vax format
+@pytest.mark.parametrize('vax', [False, True])
 @pytest.mark.parametrize('method', ['loose', 'fast'])
-def test_vg_vax_expanded(method: Method) -> None:
+def test_vg_vax_expanded(method: Method, vax: bool) -> None:
     label = Pds3Label(VG_IMQ, method=method, types=True, sources=True, expand=True,
-                      vax=True, first_suffix=False)
+                      vax=vax, first_suffix=False)
     assert label.dict == _answer('C3438954-expanded.txt')
 
 

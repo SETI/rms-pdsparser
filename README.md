@@ -247,7 +247,6 @@ parse the label and present its content.
   dictionary using the keyword plus suffix `_source`.
 * Use `expand=True` to insert the content of any referenced `^STRUCTURE` keywords into the
   returned dictionary.
-* Use `vax=True` to read attached labels from old-style Vax variable-length record files.
 * Use the `repairs` option to correct any known syntax errors in the label prior to
   parsing using regular expressions.
 
@@ -293,6 +292,9 @@ The `pdsparser` module provides several additional utilities for handling PDS3 l
   with the content of the associated ".FMT" files.
 * `is_pds3_file`[![image](https://raw.githubusercontent.com/SETI/rms-pdsparser/main/icons/link.png)](https://rms-pdsparser.readthedocs.io/en/latest/module.html#pdsparser.is_pds3_file):
   Returns True if a file appears to contain a PDS3 label, either attached or detached.
+* `is_pds3_vax_file`[![image](https://raw.githubusercontent.com/SETI/rms-pdsparser/main/icons/link.png)](https://rms-pdsparser.readthedocs.io/en/latest/module.html#pdsparser.is_pds3_vax_file):
+  Returns True if a file contains a PDS3 label and uses old-style Vax variable-length
+  records.
 
 # Contributing
 
