@@ -2,7 +2,7 @@
 #
 # rms-pdsparser - Run All Checks Script
 #
-# This script runs linting, tests, Sphinx build, and
+# This script runs linting, type checking, tests, Sphinx build, and
 # Markdown lint as separate checks. In parallel mode all requested
 # checks run concurrently.
 #
@@ -19,8 +19,10 @@
 #   --ruff-check           Run ruff check only (may combine with other --* flags)
 #   --ruff-format          Run ruff format --check only
 #   --flake8-cont          Run flake8 continuation-line checks only (E12x, E13x)
+#   --mypy                 Run mypy only
 #   --pytest               Run pytest only
 #   --pyroma               Run pyroma only
+#   --stubtest             Run stubtest only (checks __init__.pyi)
 #   --bandit               Run bandit only
 #   --vulture              Run vulture only
 #   --sphinx               Run Sphinx build only
@@ -37,8 +39,8 @@
 #   pyproject.toml [tool.coverage.report] or .coveragerc [report]).
 #
 #   RUN_* (set by this script from CLI or full-run defaults): RUN_RUFF_CHECK,
-#   RUN_RUFF_FORMAT, RUN_FLAKE8_CONT, RUN_PYTEST, RUN_PYROMA, RUN_BANDIT,
-#   RUN_VULTURE, RUN_SPHINX, RUN_PYMARKDOWN
+#   RUN_RUFF_FORMAT, RUN_FLAKE8_CONT, RUN_MYPY, RUN_PYTEST, RUN_PYROMA,
+#   RUN_STUBTEST, RUN_BANDIT, RUN_VULTURE, RUN_SPHINX, RUN_PYMARKDOWN
 #
 #   Per-check toggles (true/false). Defaults favor a minimal CI set; export to
 #   enable more tools in a given repo. Each check runs only if both RUN_* and
@@ -46,8 +48,10 @@
 #     ENABLE_RUFF_CHECK   (default: true)
 #     ENABLE_RUFF_FORMAT  (default: false)
 #     ENABLE_FLAKE8_CONT  continuation-line indent, E12x/E13x (default: true)
+#     ENABLE_MYPY         mypy on tests/ only (default: true)
 #     ENABLE_PYTEST       (default: true)
 #     ENABLE_PYROMA       (default: true)
+#     ENABLE_STUBTEST     __init__.pyi matches the runtime API (default: true)
 #     ENABLE_BANDIT       (default: false)
 #     ENABLE_VULTURE      (default: false)
 #     ENABLE_SPHINX       (default: true)
@@ -55,11 +59,12 @@
 #
 # Checks (each run separately; -d runs both Sphinx and Markdown):
 #   Code:     optional: ruff check, ruff format --check, flake8 continuation-line
-#             indent, pytest, pyroma, bandit, vulture (see ENABLE_* above). Ruff implements no E12x/E13x rule, so the
+#             indent, mypy, pytest, pyroma, stubtest, bandit, vulture (see
+#             ENABLE_* above). Ruff implements no E12x/E13x rule, so the
 #             continuation-line indent checks come from flake8 instead.
 #   Sphinx:   make -C docs html SPHINXOPTS="-W". docs/conf.py sets nitpicky = True,
 #             so unresolved cross-references are errors here too.
-#   Markdown: pymarkdown scan docs/ README.md CONTRIBUTING.md
+#   Markdown: pymarkdown scan -r docs/ .claude/ README.md CONTRIBUTING.md
 #
 # Exit codes:
 #   0 - All requested checks passed
@@ -82,8 +87,10 @@ PYTEST_WORKERS=auto
 RUN_RUFF_CHECK=false
 RUN_RUFF_FORMAT=false
 RUN_FLAKE8_CONT=false
+RUN_MYPY=false
 RUN_PYTEST=false
 RUN_PYROMA=false
+RUN_STUBTEST=false
 RUN_BANDIT=false
 RUN_VULTURE=false
 RUN_SPHINX=false
@@ -95,8 +102,10 @@ SCOPE_SPECIFIED=false
 : "${ENABLE_RUFF_CHECK:=true}"
 : "${ENABLE_RUFF_FORMAT:=false}"
 : "${ENABLE_FLAKE8_CONT:=true}"
+: "${ENABLE_MYPY:=true}"
 : "${ENABLE_PYTEST:=true}"
 : "${ENABLE_PYROMA:=true}"
+: "${ENABLE_STUBTEST:=true}"
 : "${ENABLE_BANDIT:=false}"
 : "${ENABLE_VULTURE:=false}"
 : "${ENABLE_SPHINX:=true}"
@@ -213,8 +222,10 @@ while [[ $# -gt 0 ]]; do
             RUN_RUFF_CHECK=true
             RUN_RUFF_FORMAT=true
             RUN_FLAKE8_CONT=true
+            RUN_MYPY=true
             RUN_PYTEST=true
             RUN_PYROMA=true
+            RUN_STUBTEST=true
             RUN_BANDIT=true
             RUN_VULTURE=true
             SCOPE_SPECIFIED=true
@@ -246,8 +257,18 @@ while [[ $# -gt 0 ]]; do
             SCOPE_SPECIFIED=true
             shift
             ;;
+        --mypy)
+            RUN_MYPY=true
+            SCOPE_SPECIFIED=true
+            shift
+            ;;
         --pytest)
             RUN_PYTEST=true
+            SCOPE_SPECIFIED=true
+            shift
+            ;;
+        --stubtest)
+            RUN_STUBTEST=true
             SCOPE_SPECIFIED=true
             shift
             ;;
@@ -293,8 +314,10 @@ if [ "$SCOPE_SPECIFIED" = false ]; then
     RUN_RUFF_CHECK=true
     RUN_RUFF_FORMAT=true
     RUN_FLAKE8_CONT=true
+    RUN_MYPY=true
     RUN_PYTEST=true
     RUN_PYROMA=true
+    RUN_STUBTEST=true
     RUN_BANDIT=true
     RUN_VULTURE=true
     RUN_SPHINX=true
@@ -319,14 +342,16 @@ _code_checks_any_scheduled() {
     [ "$RUN_RUFF_CHECK" = true ] && [ "$ENABLE_RUFF_CHECK" = true ] && return 0
     [ "$RUN_RUFF_FORMAT" = true ] && [ "$ENABLE_RUFF_FORMAT" = true ] && return 0
     [ "$RUN_FLAKE8_CONT" = true ] && [ "$ENABLE_FLAKE8_CONT" = true ] && return 0
+    [ "$RUN_MYPY" = true ] && [ "$ENABLE_MYPY" = true ] && return 0
     [ "$RUN_PYTEST" = true ] && [ "$ENABLE_PYTEST" = true ] && return 0
     [ "$RUN_PYROMA" = true ] && [ "$ENABLE_PYROMA" = true ] && return 0
+    [ "$RUN_STUBTEST" = true ] && [ "$ENABLE_STUBTEST" = true ] && return 0
     [ "$RUN_BANDIT" = true ] && [ "$ENABLE_BANDIT" = true ] && return 0
     [ "$RUN_VULTURE" = true ] && [ "$ENABLE_VULTURE" = true ] && return 0
     return 1
 }
 
-# ---- Code checks (ruff, flake8, pytest, pyroma, bandit, vulture) ----
+# ---- Code checks (ruff, mypy, pytest, pyroma, bandit, vulture) ----
 run_code_checks() {
     local output_file="${1:-}"
     local status_file="${2:-}"
@@ -392,6 +417,17 @@ run_code_checks() {
         fi
     fi
 
+    if [ "$RUN_MYPY" = true ] && [ "$ENABLE_MYPY" = true ]; then
+        print_info "Running mypy (tests/ only; src/ is deliberately unannotated)..."
+        if MYPYPATH=src python -m mypy tests; then
+            print_success "Mypy passed"
+        else
+            print_error "Mypy failed"
+            failed=true
+            failed_checks="${failed_checks}Code - Mypy"$'\n'
+        fi
+    fi
+
     # -n controls parallelism; --dist loadscope keeps each test module on one
     # worker to avoid time-mocking and fixture-isolation interference.
     # Coverage (--cov=src) and strict options come from pyproject.toml addopts.
@@ -414,6 +450,17 @@ run_code_checks() {
             print_error "Pyroma failed"
             failed=true
             failed_checks="${failed_checks}Code - Pyroma"$'\n'
+        fi
+    fi
+
+    if [ "$RUN_STUBTEST" = true ] && [ "$ENABLE_STUBTEST" = true ]; then
+        print_info "Running stubtest (__init__.pyi vs the runtime API)..."
+        if python -m mypy.stubtest pdsparser --mypy-config-file pyproject.toml --allowlist .stubtest-allowlist; then
+            print_success "Stubtest passed"
+        else
+            print_error "Stubtest failed"
+            failed=true
+            failed_checks="${failed_checks}Code - Stubtest"$'\n'
         fi
     fi
 
@@ -505,9 +552,10 @@ run_markdown_checks() {
     # shellcheck source=/dev/null
     source "$VENV/bin/activate"
 
-    print_info "Running PyMarkdown scan (docs/, root *.md)..."
+    print_info "Running PyMarkdown scan (docs/, .claude/, root *.md)..."
     local scan_paths=()
     [ -d "docs/" ] && scan_paths+=("docs/")
+    [ -d ".claude/" ] && scan_paths+=(".claude/")
     [ -f "README.md" ] && scan_paths+=("README.md")
     [ -f "CONTRIBUTING.md" ] && scan_paths+=("CONTRIBUTING.md")
     if [ ${#scan_paths[@]} -eq 0 ]; then
@@ -515,7 +563,7 @@ run_markdown_checks() {
         deactivate 2>/dev/null || true
         return 0
     fi
-    if python -m pymarkdown scan "${scan_paths[@]}"; then
+    if python -m pymarkdown scan -r "${scan_paths[@]}"; then
         print_success "PyMarkdown scan passed"
         deactivate 2>/dev/null || true
         return 0

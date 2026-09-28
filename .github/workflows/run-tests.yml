@@ -42,9 +42,24 @@ jobs:
         run: |
           flake8 --select=E12,E13 src tests
 
+      # Every module under tests/ is checked. src/ is deliberately unannotated; its
+      # public types live in __init__.pyi, and the overrides in pyproject.toml keep
+      # mypy off the private modules. This step matches `--mypy` in
+      # scripts/run-all-checks.sh.
+      - name: Mypy
+        run: |
+          MYPYPATH=src mypy tests
+
       - name: Pyroma
         run: |
           pyroma .
+
+      # The published stub, __init__.pyi, is hand-written and must keep describing the
+      # runtime API. The allowlist accepts only the deliberate absence of stubs for the
+      # private modules.
+      - name: Stubtest
+        run: |
+          python -m mypy.stubtest pdsparser --mypy-config-file pyproject.toml --allowlist .stubtest-allowlist
 
       # -W makes warnings errors; docs/conf.py sets nitpicky = True, so a
       # cross-reference with no target fails the build too.
@@ -54,7 +69,7 @@ jobs:
 
       - name: PyMarkdown
         run: |
-          pymarkdown scan docs/ README.md CONTRIBUTING.md
+          pymarkdown scan -r docs/ .claude/ README.md CONTRIBUTING.md
 
   test:
     name: Test rms-pdsparser

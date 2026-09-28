@@ -3,9 +3,10 @@
 ##########################################################################################
 
 import datetime as dt
+from typing import Any
 
 import pytest
-from pyparsing import ParseException, StringEnd
+from pyparsing import ParseException, ParserElement, StringEnd
 
 from pdsparser._PDS3_GRAMMAR import (_Integer,
                                      _BasedInteger,
@@ -33,11 +34,11 @@ from pdsparser._PDS3_GRAMMAR import (_Integer,
                                      _EndStatement)
 
 
-def tz(minutes):
+def tz(minutes: int) -> dt.timezone:
     return dt.timezone(dt.timedelta(seconds=60 * minutes))
 
 
-def _grammars(cls, test):
+def _grammars(cls: type[Any], test: int) -> list[ParserElement]:
     """The grammars of this class selected by `test`.
 
     If test is 1, use grammar; if test is 2, use alt_grammar; if test is 3, use both (if
@@ -54,7 +55,8 @@ def _grammars(cls, test):
     return grammars
 
 
-def _pass(type_, string, value, strval=None, vtype=None, test=3, super_=True):
+def _pass(type_: type[Any], string: str, value: Any, strval: str | None = None,
+          vtype: type[Any] | None = None, test: int = 3, super_: bool = True) -> Any:
     """Test grammar(s) for success, using parsers for this class and all superclasses.
 
     Returns the object parsed by the last grammar tested.
@@ -82,7 +84,7 @@ def _pass(type_, string, value, strval=None, vtype=None, test=3, super_=True):
     return obj
 
 
-def _fail(type_, string, test=3, super_=True):
+def _fail(type_: type[Any], string: str, test: int = 3, super_: bool = True) -> None:
     """Test grammar(s) for failure, using parsers for this class and all superclasses."""
 
     for cls in type_.__mro__:
@@ -101,7 +103,7 @@ def _fail(type_, string, test=3, super_=True):
 # _Integer
 ##########################################################################################
 
-def test_integer_attributes():
+def test_integer_attributes() -> None:
 
     obj = _pass(_Integer, '123', 123)
     assert obj.type_ == 'integer'
@@ -116,12 +118,12 @@ def test_integer_attributes():
     ('-123', -123, None),
     ('+123', 123, '123'),
 ])
-def test_integer_parses(string, value, strval):
+def test_integer_parses(string: str, value: Any, strval: str) -> None:
     _pass(_Integer, string, value, strval)
 
 
 @pytest.mark.parametrize('string', ['+ 123', '- 123'])
-def test_integer_rejects(string):
+def test_integer_rejects(string: str) -> None:
     _fail(_Integer, string)
 
 
@@ -129,7 +131,7 @@ def test_integer_rejects(string):
 # _BasedInteger
 ##########################################################################################
 
-def test_based_integer_attributes():
+def test_based_integer_attributes() -> None:
 
     obj = _pass(_BasedInteger, '2#11111111#', 255, '2#11111111#', int)
     assert str(obj) == '2#11111111#'
@@ -149,13 +151,13 @@ def test_based_integer_attributes():
     ('8#10000#', 4096, None),
     ('16#FF#', 255, None),
 ])
-def test_based_integer_parses(string, value, strval):
+def test_based_integer_parses(string: str, value: Any, strval: str) -> None:
     _pass(_BasedInteger, string, value, strval)
 
 
 @pytest.mark.parametrize('string', ['1#000#', '7#1#', '3#123#', '8# 123#', '8 #123#',
                                     '8#123 #'])
-def test_based_integer_rejects(string):
+def test_based_integer_rejects(string: str) -> None:
     _fail(_BasedInteger, string)
 
 
@@ -163,7 +165,7 @@ def test_based_integer_rejects(string):
 # _Real
 ##########################################################################################
 
-def test_real_attributes():
+def test_real_attributes() -> None:
 
     obj = _pass(_Real, '123.', 123., '123.', float)
     assert obj.type_ == 'real'
@@ -184,13 +186,13 @@ def test_real_attributes():
     ('5e+2', 500, '500.', float),
     ('-1e+20', -1.e20, '-1.e+20', None),
 ])
-def test_real_parses(string, value, strval, vtype):
+def test_real_parses(string: str, value: Any, strval: str, vtype: type[Any]) -> None:
     _pass(_Real, string, value, strval, vtype)
 
 
 @pytest.mark.parametrize('string', ['1234.5e0006', '1234 .5e06', '1234.5 e06',
                                     '1234.5e 06', '1234.5e+ 06'])
-def test_real_rejects(string):
+def test_real_rejects(string: str) -> None:
     _fail(_Real, string)
 
 
@@ -198,7 +200,7 @@ def test_real_rejects(string):
 # _NumberWithUnit
 ##########################################################################################
 
-def test_number_with_unit_attributes():
+def test_number_with_unit_attributes() -> None:
 
     obj = _pass(_NumberWithUnit, '123.  <km>', 123., '123. <km>', float)
     assert obj.unit == '<km>'
@@ -209,7 +211,7 @@ def test_number_with_unit_attributes():
     assert obj.value == 123.
 
 
-def test_number_with_unit_spaces_in_unit():
+def test_number_with_unit_spaces_in_unit() -> None:
 
     obj = _pass(_NumberWithUnit, '-1234.5 < km/s>', -1234.5, '-1234.5 <km/s>')
     assert obj.unit == '<km/s>'
@@ -219,7 +221,7 @@ def test_number_with_unit_spaces_in_unit():
     assert obj.unit == '<local day>'
 
 
-def test_number_with_unit_compares_as_number():
+def test_number_with_unit_compares_as_number() -> None:
     assert _NumberWithUnit.grammar.parse_string('100 <km>')[0] == 100
 
 
@@ -227,7 +229,7 @@ def test_number_with_unit_compares_as_number():
 # _HmsTime and _UtcTime
 ##########################################################################################
 
-def test_hms_time_attributes():
+def test_hms_time_attributes() -> None:
 
     obj = _pass(_HmsTime, '12:34:56', dt.time(12, 34, 56))
     assert obj.type_ == 'local_time'
@@ -238,7 +240,7 @@ def test_hms_time_attributes():
     assert type(obj.sec) is int
 
 
-def test_hms_time_fractional_seconds():
+def test_hms_time_fractional_seconds() -> None:
 
     obj = _pass(_HmsTime, '12:34:56.123456', dt.time(12, 34, 56, 123456),
                 strval='12:34:56.123456')
@@ -256,7 +258,7 @@ def test_hms_time_fractional_seconds():
     (_HmsTime, '12:34', dt.time(12, 34), '12:34:00', 'local_time'),
     (_UtcTime, '12:34Z', dt.time(12, 34), '12:34:00', 'utc_time'),
 ])
-def test_simple_time_type(type_, string, value, strval, type_name):
+def test_simple_time_type(type_: type[Any], string: str, value: Any, strval: str, type_name: str) -> None:
     obj = _pass(type_, string, value, strval)
     assert obj.type_ == type_name
 
@@ -267,7 +269,7 @@ def test_simple_time_type(type_, string, value, strval, type_name):
     ('"12:34:56.12345678"', dt.time(12, 34, 56, 123457), '12:34:56.123457'),
     ('"01:01:01"', dt.time(1, 1, 1), None),
 ])
-def test_hms_time_quoted(string, value, strval):
+def test_hms_time_quoted(string: str, value: Any, strval: str) -> None:
     _pass(_HmsTime, string, value, strval)
 
 
@@ -276,7 +278,7 @@ def test_hms_time_quoted(string, value, strval):
     ('"12:34:01."', dt.time(12, 34, 1), float),
     ('"01:01"', dt.time(1, 1, 0), int),
 ])
-def test_hms_time_leading_zeros(string, value, sec_type):
+def test_hms_time_leading_zeros(string: str, value: Any, sec_type: type[Any]) -> None:
     obj = _pass(_HmsTime, string, value)
     assert isinstance(obj.sec, sec_type)
 
@@ -288,7 +290,7 @@ def test_hms_time_leading_zeros(string, value, sec_type):
     (_HmsTime, '123: 34'),
     (_UtcTime, '12:34 Z'),
 ])
-def test_simple_time_rejects(type_, string):
+def test_simple_time_rejects(type_: type[Any], string: str) -> None:
     _fail(type_, string)
 
 
@@ -296,11 +298,11 @@ def test_simple_time_rejects(type_, string):
     (_HmsTime, '12:34Z'),
     (_UtcTime, '12:34'),
 ])
-def test_simple_time_rejects_other_type(type_, string):
+def test_simple_time_rejects_other_type(type_: type[Any], string: str) -> None:
     _fail(type_, string, super_=False)
 
 
-def test_hms_time_one_digit_hour_is_loose_only():
+def test_hms_time_one_digit_hour_is_loose_only() -> None:
     _fail(_HmsTime, '2:34', test=1)
     _pass(_HmsTime, '2:34', dt.time(2, 34), '02:34:00', test=2, super_=False)
 
@@ -318,7 +320,7 @@ def test_hms_time_one_digit_hour_is_loose_only():
     (_HmsTime, '"12:34: 6"', dt.time(12, 34, 6), None, None),
     (_HmsTime, '"12:34: 6.5"', dt.time(12, 34, 6, 500000), '12:34:06.500', None),
 ])
-def test_simple_time_blanks_for_zeros(type_, string, value, strval, type_name):
+def test_simple_time_blanks_for_zeros(type_: type[Any], string: str, value: Any, strval: str, type_name: str) -> None:
     obj = _pass(type_, string, value, strval, test=2, super_=False)
     if type_name:
         assert obj.type_ == type_name
@@ -344,13 +346,13 @@ def test_simple_time_blanks_for_zeros(type_, string, value, strval, type_name):
     ('+0', 0, '+00'),
     ('+1', 60, '+01'),
 ])
-def test_time_zone_parses(string, minutes, strval):
+def test_time_zone_parses(string: str, minutes: int, strval: str) -> None:
     _pass(_TimeZone, string, tz(minutes), strval, dt.timezone)
 
 
 @pytest.mark.parametrize('string', ['0:30', '-000', ' -0:30', '-0 :30', '-0: 30', '-24',
                                     '+24', '+0:60', 'Z'])
-def test_time_zone_rejects(string):
+def test_time_zone_rejects(string: str) -> None:
     _fail(_TimeZone, string)
 
 
@@ -358,7 +360,7 @@ def test_time_zone_rejects(string):
     ('- 0:30', -30, '-00:30'),
     ('-01: 0', -60, '-01:00'),
 ])
-def test_time_zone_blanks_are_loose_only(string, minutes, strval):
+def test_time_zone_blanks_are_loose_only(string: str, minutes: int, strval: str) -> None:
     _fail(_TimeZone, string, test=1)
     _pass(_TimeZone, string, tz(minutes), strval, test=2)
 
@@ -371,7 +373,7 @@ def test_time_zone_blanks_are_loose_only(string, minutes, strval):
     ('12:34+2', 2*60, '12:34:00+02', 3600*12 + 34*60 - 3600*2),
     ('12:34+2:30', 2*60 + 30, '12:34:00+02:30', 3600*12 + 34*60 - 3600*2 - 30*60),
 ])
-def test_zoned_time_attributes(string, minutes, strval, sec):
+def test_zoned_time_attributes(string: str, minutes: int, strval: str, sec: int) -> None:
 
     obj = _pass(_ZonedTime, string, dt.time(12, 34, tzinfo=tz(minutes)), strval,
                 super_=False)
@@ -387,16 +389,16 @@ def test_zoned_time_attributes(string, minutes, strval, sec):
     ('"12:34-02"', -2*60, '12:34:00-02'),
     ('"12:34-02:45"', -2*60 - 45, '12:34:00-02:45'),
 ])
-def test_zoned_time_quoted(string, minutes, strval):
+def test_zoned_time_quoted(string: str, minutes: int, strval: str) -> None:
     _pass(_ZonedTime, string, dt.time(12, 34, tzinfo=tz(minutes)), strval, super_=False)
 
 
 @pytest.mark.parametrize('string', ['12:34 +2:30', '12:34 +02:30', '12:34 -2'])
-def test_zoned_time_rejects(string):
+def test_zoned_time_rejects(string: str) -> None:
     _fail(_ZonedTime, string)
 
 
-def test_zoned_time_blank_in_zone_is_loose_only():
+def test_zoned_time_blank_in_zone_is_loose_only() -> None:
     _fail(_ZonedTime, '12:34- 2', test=1)
     _pass(_ZonedTime, '12:34- 2', dt.time(12, 34, tzinfo=tz(-2*60)), '12:34:00-02',
           test=2)
@@ -406,7 +408,7 @@ def test_zoned_time_blank_in_zone_is_loose_only():
 # _Time
 ##########################################################################################
 
-def test_time_attributes():
+def test_time_attributes() -> None:
 
     obj = _pass(_Time, '12:34:56', dt.time(12, 34, 56))
     assert obj.type_ == 'local_time'
@@ -417,7 +419,7 @@ def test_time_attributes():
     assert type(obj.sec) is int
 
 
-def test_time_fractional_seconds():
+def test_time_fractional_seconds() -> None:
 
     obj = _pass(_Time, '12:34:56.123456', dt.time(12, 34, 56, 123456),
                 strval='12:34:56.123456')
@@ -434,7 +436,7 @@ def test_time_fractional_seconds():
     ('12:34', dt.time(12, 34), '12:34:00', 'local_time'),
     ('12:34Z', dt.time(12, 34), '12:34:00', 'utc_time'),
 ])
-def test_time_type(string, value, strval, type_name):
+def test_time_type(string: str, value: Any, strval: str, type_name: str) -> None:
     obj = _pass(_Time, string, value, strval)
     assert obj.type_ == type_name
 
@@ -444,11 +446,11 @@ def test_time_type(string, value, strval, type_name):
     ('"12:34:56.5"', dt.time(12, 34, 56, 500000), '12:34:56.500'),
     ('"12:34:56.12345678"', dt.time(12, 34, 56, 123457), '12:34:56.123457'),
 ])
-def test_time_quoted(string, value, strval):
+def test_time_quoted(string: str, value: Any, strval: str) -> None:
     _pass(_Time, string, value, strval)
 
 
-def test_time_zoned():
+def test_time_zoned() -> None:
 
     obj = _pass(_Time, '12:34+2:30', dt.time(12, 34, tzinfo=tz(2*60 + 30)),
                 '12:34:00+02:30', dt.time, test=2)
@@ -460,7 +462,7 @@ def test_time_zoned():
 
 
 @pytest.mark.parametrize('string', ['12:34 +2:30', '12:34 +02:30'])
-def test_time_rejects_blank_before_zone(string):
+def test_time_rejects_blank_before_zone(string: str) -> None:
     _fail(_Time, string, test=1)
 
 
@@ -473,7 +475,7 @@ def test_time_rejects_blank_before_zone(string):
     ('12: 4:56.123456', dt.time(12, 4, 56, 123456), '12:04:56.123456'),
     ('12:34: 6.123456', dt.time(12, 34, 6, 123456), '12:34:06.123456'),
 ])
-def test_time_blanks_for_zeros(string, value, strval):
+def test_time_blanks_for_zeros(string: str, value: Any, strval: str) -> None:
     _pass(_Time, string, value, strval, test=2)
 
 
@@ -485,7 +487,7 @@ def test_time_blanks_for_zeros(string, value, strval):
     ('2000-01-01', dt.date(2000, 1, 1), 0),
     ('2000-003', dt.date(2000, 1, 3), 2),
 ])
-def test_date_attributes(string, value, day):
+def test_date_attributes(string: str, value: Any, day: int) -> None:
 
     obj = _pass(_Date, string, value)
     assert obj.type_ == 'date'
@@ -499,18 +501,18 @@ def test_date_attributes(string, value, day):
     ('2000-12-31', dt.date(2000, 12, 31)),
     ('2000-366', dt.date(2000, 12, 31)),
 ])
-def test_date_parses(string, value):
+def test_date_parses(string: str, value: Any) -> None:
     _pass(_Date, string, value)
 
 
 @pytest.mark.parametrize('string', ['3000-01-01', '2000-00-01', '2000-13-01',
                                     '2000-01-00', '2000-01-32'])
-def test_date_rejects(string):
+def test_date_rejects(string: str) -> None:
     _fail(_Date, string)
 
 
 @pytest.mark.parametrize('string', ['2000- 1-01', '2000-01- 1'])
-def test_date_blanks_for_zeros_are_loose_only(string):
+def test_date_blanks_for_zeros_are_loose_only(string: str) -> None:
     _fail(_Date, string, test=1)
     _pass(_Date, string, dt.date(2000, 1, 1), '2000-01-01', test=2, super_=False)
 
@@ -519,7 +521,7 @@ def test_date_blanks_for_zeros_are_loose_only(string):
 # _DateTime
 ##########################################################################################
 
-def test_date_time_type():
+def test_date_time_type() -> None:
     obj = _pass(_DateTime, '2000-01-03T12:34', dt.datetime(2000, 1, 3, 12, 34),
                 '2000-01-03T12:34:00', test=1)
     assert obj.type_ == 'date_time'
@@ -535,7 +537,7 @@ def test_date_time_type():
     ('2000-01-01T23:46-4: 0', dt.datetime(2000, 1, 1, 23, 46, tzinfo=tz(-4*60)),
      '2000-01-01T23:46:00-04:00', 2, 1, 60 * (46 + 60 * 23) - 20 * 3600),
 ])
-def test_date_time_attributes(string, value, strval, test, day, sec):
+def test_date_time_attributes(string: str, value: Any, strval: str, test: int, day: int, sec: int) -> None:
 
     obj = _pass(_DateTime, string, value, strval, test=test)
     assert obj.day == day
@@ -551,13 +553,13 @@ def test_date_time_attributes(string, value, strval, test, day, sec):
     ('2004-366T04:38:16.12345678Z', dt.datetime(2004, 12, 31, 4, 38, 16, 123457),
      '2004-366T04:38:16.123457'),
 ])
-def test_date_time_parses(string, value, strval):
+def test_date_time_parses(string: str, value: Any, strval: str) -> None:
     _pass(_DateTime, string, value, strval)
 
 
 @pytest.mark.parametrize('string', ['2000-01-01 T12:34', '2000-01-01T 12:34',
                                     '2000-01-01T12:34 Z', '2000-01-01T12:34:56+07:08'])
-def test_date_time_rejects(string):
+def test_date_time_rejects(string: str) -> None:
     _fail(_DateTime, string)
 
 
@@ -567,7 +569,7 @@ def test_date_time_rejects(string):
     ('2000-01-01T12:34:56+7:15', dt.datetime(2000, 1, 1, 12, 34, 56, tzinfo=tz(7*60+15)),
      '2000-01-01T12:34:56+07:15'),
 ])
-def test_date_time_zone_is_loose_only(string, value, strval):
+def test_date_time_zone_is_loose_only(string: str, value: Any, strval: str) -> None:
     _fail(_DateTime, string, test=1)
     _pass(_DateTime, string, value, strval, test=2)
 
@@ -576,7 +578,7 @@ def test_date_time_zone_is_loose_only(string, value, strval):
                                     '2000-01- 2T12:34Z', '2000-01-01T 1:23+4',
                                     '2000-01-01T12: 4:56+7:15',
                                     '2000-01-01T12:34: 6+07:08'])
-def test_date_time_strict_rejects_blanks(string):
+def test_date_time_strict_rejects_blanks(string: str) -> None:
     _fail(_DateTime, string, test=1)
 
 
@@ -592,7 +594,7 @@ def test_date_time_strict_rejects_blanks(string):
     ('2004-11-22T12:34:56+07: 0', dt.datetime(2004, 11, 22, 12, 34, 56, tzinfo=tz(7*60)),
      '2004-11-22T12:34:56+07:00'),
 ])
-def test_date_time_blanks_for_zeros(string, value, strval):
+def test_date_time_blanks_for_zeros(string: str, value: Any, strval: str) -> None:
     _pass(_DateTime, string, value, strval, test=2)
 
 
@@ -600,7 +602,7 @@ def test_date_time_blanks_for_zeros(string, value, strval):
 # _Text
 ##########################################################################################
 
-def test_text_identifier():
+def test_text_identifier() -> None:
 
     obj = _pass(_Text, 'ABC', 'ABC', 'ABC')
     assert obj.type_ == 'identifier'
@@ -609,7 +611,7 @@ def test_text_identifier():
     assert obj == 'ABC'
 
 
-def test_text_quoted():
+def test_text_quoted() -> None:
 
     obj = _pass(_Text, '"abc"', 'abc', '"abc"')
     assert obj.type_ == 'quoted_text'
@@ -618,7 +620,7 @@ def test_text_quoted():
     assert obj == 'abc'
 
 
-def test_text_lowercase_identifier_is_loose_only():
+def test_text_lowercase_identifier_is_loose_only() -> None:
 
     _fail(_Text, 'abc', test=1)
     obj = _pass(_Text, 'abc', 'abc', '"abc"', test=2)
@@ -627,7 +629,7 @@ def test_text_lowercase_identifier_is_loose_only():
     assert obj == 'abc'
 
 
-def test_text_quoted_symbol():
+def test_text_quoted_symbol() -> None:
 
     obj = _pass(_Text, "'N/A'", 'N/A')
     assert obj.type_ == 'quoted_symbol'
@@ -635,7 +637,7 @@ def test_text_quoted_symbol():
     assert obj == 'N/A'
 
 
-def test_text_multiline():
+def test_text_multiline() -> None:
 
     obj = _pass(_Text, '"Multiline\ntext"', 'Multiline\ntext')
     assert repr(obj) == '_Text("Multiline\ntext")'
@@ -649,16 +651,16 @@ def test_text_multiline():
     ('""', '', None),
     ('"   "', '', None),
 ])
-def test_text_parses(string, value, strval):
+def test_text_parses(string: str, value: Any, strval: str) -> None:
     _pass(_Text, string, value, strval)
 
 
-def test_text_unquoted_symbol_is_loose_only():
+def test_text_unquoted_symbol_is_loose_only() -> None:
     _fail(_Text, 'N/A', test=1)
     _pass(_Text, 'N/A', 'N/A', "'N/A'", test=2)
 
 
-def test_text_rejects_unquoted_blank():
+def test_text_rejects_unquoted_blank() -> None:
     _fail(_Text, 'abc def')
 
 
@@ -666,7 +668,7 @@ def test_text_rejects_unquoted_blank():
 # _Set
 ##########################################################################################
 
-def test_set_attributes():
+def test_set_attributes() -> None:
 
     obj = _pass(_Set, '{1, 2, \n3}', {1, 2, 3}, '{1, 2, 3}', set)
     assert obj.type_ == 'set'
@@ -676,7 +678,7 @@ def test_set_attributes():
     assert obj.list == [1, 2, 3]
 
 
-def test_set_mixed_units():
+def test_set_mixed_units() -> None:
 
     obj = _pass(_Set, '{1, 2<km>}', {1, (2, '<km>')}, '{1, 2 <km>}')
     assert (2, '<km>') in obj.full_value
@@ -686,7 +688,7 @@ def test_set_mixed_units():
     assert type(obj[1]) is _NumberWithUnit
 
 
-def test_set_common_unit():
+def test_set_common_unit() -> None:
 
     obj = _pass(_Set, '{1<km>, 2<km>}', {1, 2}, '{1 <km>, 2 <km>}')
     assert type(obj[0]) is _NumberWithUnit
@@ -696,7 +698,7 @@ def test_set_common_unit():
     assert obj.unit == '<km>'
 
 
-def test_set_quotes():
+def test_set_quotes() -> None:
 
     obj = _pass(_Set, '{1, "abc", \'def\', GHI}', {1, "abc", "def", "GHI"},
                 '{1, "abc", \'def\', "GHI"}')
@@ -712,7 +714,7 @@ def test_set_quotes():
     assert obj.quote == '"'
 
 
-def test_set_single_quote():
+def test_set_single_quote() -> None:
 
     obj = _pass(_Set, '{1, \'def\', GHI}', {1, "def", "GHI"}, '{1, \'def\', "GHI"}')
     assert obj[1].quote == "'"
@@ -720,7 +722,7 @@ def test_set_single_quote():
     assert obj.quote == "'"
 
 
-def test_set_no_quotes():
+def test_set_no_quotes() -> None:
 
     obj = _pass(_Set, '{1, GHI}', {1, "GHI"}, '{1, "GHI"}')
     assert obj[1].quote == ''
@@ -732,7 +734,7 @@ def test_set_no_quotes():
     ('{1, 2.0, "three"}', {1, 2.0, "three"}, '{1, 2., "three"}'),
     ('{1, 2.0, THREE}', {1, 2.0, "THREE"}, '{1, 2., "THREE"}'),
 ])
-def test_set_parses(string, value, strval):
+def test_set_parses(string: str, value: Any, strval: str) -> None:
     _pass(_Set, string, value, strval)
 
 
@@ -740,13 +742,13 @@ def test_set_parses(string, value, strval):
     ('{1, 2.0, three}', {1, 2.0, "three"}, '{1, 2., "three"}'),
     ('{1, 2.0, N/A}', {1, 2.0, "N/A"}, "{1, 2., 'N/A'}"),
 ])
-def test_set_unquoted_text_is_loose_only(string, value, strval):
+def test_set_unquoted_text_is_loose_only(string: str, value: Any, strval: str) -> None:
     _fail(_Set, string, test=1)
     _pass(_Set, string, value, strval, test=2)
 
 
 @pytest.mark.parametrize('string', ['{1, (2, 3)}', '{1, {2, 3}}'])
-def test_set_rejects_nesting(string):
+def test_set_rejects_nesting(string: str) -> None:
     _fail(_Set, string)
 
 
@@ -754,7 +756,7 @@ def test_set_rejects_nesting(string):
 # _Sequence
 ##########################################################################################
 
-def test_sequence_attributes():
+def test_sequence_attributes() -> None:
 
     obj = _pass(_Sequence, '(1, 2, \n3)', [1, 2, 3], '(1, 2, 3)', list)
     assert obj.type_ == 'sequence_1D'
@@ -763,7 +765,7 @@ def test_sequence_attributes():
     assert obj == [1, 2, 3]
 
 
-def test_sequence_mixed_units():
+def test_sequence_mixed_units() -> None:
 
     obj = _pass(_Sequence, '(1, 2<km>)', [1, 2], '(1, 2 <km>)', list)
     assert obj[0].full_value == 1
@@ -775,7 +777,7 @@ def test_sequence_mixed_units():
     assert obj.all_units == [None, '<km>']
 
 
-def test_sequence_common_unit():
+def test_sequence_common_unit() -> None:
 
     obj = _pass(_Sequence, '(1 <km>, 2.<km>)', [1, 2.], '(1 <km>, 2. <km>)', list)
     assert obj[0].full_value == (1, '<km>')
@@ -795,7 +797,7 @@ def test_sequence_common_unit():
     ('(1, 2.0, "three")', [1, 2.0, "three"], '(1, 2., "three")'),
     ('(1, 2.0, THREE)', [1, 2.0, "THREE"], '(1, 2., "THREE")'),
 ])
-def test_sequence_parses(string, value, strval):
+def test_sequence_parses(string: str, value: Any, strval: str) -> None:
     _pass(_Sequence, string, value, strval)
 
 
@@ -803,13 +805,13 @@ def test_sequence_parses(string, value, strval):
     ('(1, 2.0, three)', [1, 2.0, "three"], '(1, 2., "three")'),
     ('(1, 2.0, N/A)', [1, 2.0, "N/A"], "(1, 2., 'N/A')"),
 ])
-def test_sequence_unquoted_text_is_loose_only(string, value, strval):
+def test_sequence_unquoted_text_is_loose_only(string: str, value: Any, strval: str) -> None:
     _fail(_Sequence, string, test=1)
     _pass(_Sequence, string, value, strval, test=2)
 
 
 @pytest.mark.parametrize('string', ['(1, (2, 3))', '(1, {2, 3})'])
-def test_sequence_rejects_nesting(string):
+def test_sequence_rejects_nesting(string: str) -> None:
     _fail(_Sequence, string)
 
 
@@ -817,14 +819,14 @@ def test_sequence_rejects_nesting(string):
 # _Sequence2D
 ##########################################################################################
 
-def test_sequence_2d_one_row():
+def test_sequence_2d_one_row() -> None:
 
     obj = _pass(_Sequence2D, '((1, 2, 3))', [[1, 2, 3]], '((1, 2, 3))', list)
     assert obj[0].value == [1, 2, 3]
     assert type(obj[0].value) is list
 
 
-def test_sequence_2d_two_rows():
+def test_sequence_2d_two_rows() -> None:
 
     obj = _pass(_Sequence2D, '((1, 2, 3), (4,5))', [[1, 2, 3], [4, 5]],
                 '((1, 2, 3), (4, 5))', list)
@@ -838,7 +840,7 @@ def test_sequence_2d_two_rows():
     assert obj.all_units == [[None, None, None], [None, None]]
 
 
-def test_sequence_2d_mixed_units():
+def test_sequence_2d_mixed_units() -> None:
 
     obj = _pass(_Sequence2D, '((1, 2, 3), (4,5 <km>))', [[1, 2, 3], [4, 5]],
                 '((1, 2, 3), (4, 5 <km>))', list)
@@ -854,7 +856,7 @@ def test_sequence_2d_mixed_units():
     assert type(obj[1][1].value) is int
 
 
-def test_sequence_2d_unit_in_one_row():
+def test_sequence_2d_unit_in_one_row() -> None:
 
     obj = _pass(_Sequence2D, '((1, 2<km>))', [[1, 2]], '((1, 2 <km>))')
     assert obj[0][0].full_value == 1
@@ -868,7 +870,7 @@ def test_sequence_2d_unit_in_one_row():
     ('(\n(\n\t1, 2\n,3\t))', [[1, 2, 3]], '((1, 2, 3))'),
     ('((1, 2.0, "three"))', [[1, 2.0, "three"]], '((1, 2., "three"))'),
 ])
-def test_sequence_2d_parses(string, value, strval):
+def test_sequence_2d_parses(string: str, value: Any, strval: str) -> None:
     _pass(_Sequence2D, string, value, strval)
 
 
@@ -876,17 +878,17 @@ def test_sequence_2d_parses(string, value, strval):
     ('((1, 2.0, three))', [[1, 2.0, "three"]], '((1, 2., "three"))'),
     ('((1,2)\n(3,4))', [[1, 2], [3, 4]], None),
 ])
-def test_sequence_2d_loose_only(string, value, strval):
+def test_sequence_2d_loose_only(string: str, value: Any, strval: str) -> None:
     _fail(_Sequence2D, string, test=1)
     _pass(_Sequence2D, string, value, strval, test=2)
 
 
-def test_sequence_2d_strict_rejects_unquoted_symbol():
+def test_sequence_2d_strict_rejects_unquoted_symbol() -> None:
     _fail(_Sequence2D, '((1, 2.0, N/A))', test=1)
 
 
 @pytest.mark.parametrize('string', ['((1, (2, 3)))', '((1, {2, 3}))'])
-def test_sequence_2d_rejects_nesting(string):
+def test_sequence_2d_rejects_nesting(string: str) -> None:
     _fail(_Sequence2D, string)
 
 
@@ -898,11 +900,11 @@ def test_sequence_2d_rejects_nesting(string):
     ('"DOCUMENT.PDF"', 'DOCUMENT.PDF'),
     ('"DOC.TXT.PDF"', 'DOC.TXT.PDF'),
 ])
-def test_simple_pointer_parses(string, value):
+def test_simple_pointer_parses(string: str, value: Any) -> None:
     _pass(_SimplePointer, string, value, string)
 
 
-def test_simple_pointer_directory_is_loose_only():
+def test_simple_pointer_directory_is_loose_only() -> None:
     _fail(_SimplePointer, '"DIR/DOC.TXT.PDF"', test=1)
     _pass(_SimplePointer, '"DIR/DOC.TXT.PDF"', 'DIR/DOC.TXT.PDF', '"DIR/DOC.TXT.PDF"',
           test=2)
@@ -913,11 +915,11 @@ def test_simple_pointer_directory_is_loose_only():
     ('123\t<BYTES>', '123 <BYTES>'),
     ('123<bytes>', '123 <BYTES>'),
 ])
-def test_local_pointer_parses(string, strval):
+def test_local_pointer_parses(string: str, strval: str) -> None:
     _pass(_LocalPointer, string, 123, strval, int)
 
 
-def test_local_pointer_bytes():
+def test_local_pointer_bytes() -> None:
     obj = _pass(_LocalPointer, '123<bytes>', 123, '123 <BYTES>', int)
     assert obj.full_value == (123, '<BYTES>')
 
@@ -927,7 +929,7 @@ def test_local_pointer_bytes():
     ('("TABLE.TAB", 800 <bytes>)', '("TABLE.TAB", 800 <BYTES>)',
      ("TABLE.TAB", 800, '<BYTES>'), 800, '<BYTES>'),
 ])
-def test_offset_pointer_attributes(string, strval, full_value, offset, unit):
+def test_offset_pointer_attributes(string: str, strval: str, full_value: Any, offset: int, unit: str) -> None:
 
     obj = _pass(_OffsetPointer, string, 'TABLE.TAB', strval)
     assert obj.full_value == full_value
@@ -940,7 +942,7 @@ def test_offset_pointer_attributes(string, strval, full_value, offset, unit):
     ('("DIR/TABLE.TAB", 2)', '("DIR/TABLE.TAB", 2)'),
     ('("DIR/TABLE.TAB", 800 <bytes>)', '("DIR/TABLE.TAB", 800 <BYTES>)'),
 ])
-def test_offset_pointer_directory_is_loose_only(string, strval):
+def test_offset_pointer_directory_is_loose_only(string: str, strval: str) -> None:
     _fail(_OffsetPointer, string, test=1)
     _pass(_OffsetPointer, string, 'DIR/TABLE.TAB', strval, test=2)
 
@@ -949,22 +951,22 @@ def test_offset_pointer_directory_is_loose_only(string, strval):
     '{"1.GIF", "2.GIF", "3.GIF"}',
     '{"1.GIF", "2.GIF", "2.GIF", "3.GIF"}',
 ])
-def test_set_pointer_parses(string):
+def test_set_pointer_parses(string: str) -> None:
     _pass(_SetPointer, string, {"1.GIF", "2.GIF", "3.GIF"}, '{"1.GIF", "2.GIF", "3.GIF"}')
 
 
-def test_set_pointer_directory_is_loose_only():
+def test_set_pointer_directory_is_loose_only() -> None:
     string = '{"A/1.GIF", "A/2.GIF", "A/3.GIF"}'
     _fail(_SetPointer, string, test=1)
     _pass(_SetPointer, string, {"A/1.GIF", "A/2.GIF", "A/3.GIF"}, string, test=2)
 
 
-def test_sequence_pointer_parses():
+def test_sequence_pointer_parses() -> None:
     string = '("1.GIF", "2.GIF", "3.GIF")'
     _pass(_SequencePointer, string, ["1.GIF", "2.GIF", "3.GIF"], string, list)
 
 
-def test_sequence_pointer_directory_is_loose_only():
+def test_sequence_pointer_directory_is_loose_only() -> None:
     string = '("A/1.GIF", "A/2.GIF", "A/3.GIF")'
     _fail(_SequencePointer, string, test=1)
     _pass(_SequencePointer, string, ["A/1.GIF", "A/2.GIF", "A/3.GIF"], string, test=2)
@@ -979,14 +981,14 @@ ID_TYPES = [(_AttributeID, ''), (_PointerID, '^')]
 
 @pytest.mark.parametrize(('type_', 'prefix'), ID_TYPES)
 @pytest.mark.parametrize('name', ['OBJECT', 'OBJECT_2', 'N123', 'N123:X456'])
-def test_id_parses(type_, prefix, name):
+def test_id_parses(type_: type[Any], prefix: str, name: str) -> None:
     _pass(type_, prefix + name, prefix + name, prefix + name)
 
 
 @pytest.mark.parametrize(('type_', 'prefix'), ID_TYPES)
 @pytest.mark.parametrize('name', ['NAME_', 'NAME_:MORE', '_NAME', '1NAME', 'Name',
                                   'AAA:BBB:C'])
-def test_id_rejects(type_, prefix, name):
+def test_id_rejects(type_: type[Any], prefix: str, name: str) -> None:
     _fail(type_, prefix + name)
 
 
@@ -1001,16 +1003,16 @@ def test_id_rejects(type_, prefix, name):
      ('^CASSINI:INDEX', ("index.tab", 800, '<BYTES>')),
      '^CASSINI:INDEX = ("index.tab", 800 <BYTES>)'),
 ])
-def test_statement_parses(string, value, strval):
+def test_statement_parses(string: str, value: Any, strval: str) -> None:
     _pass(_Statement, string, value, strval)
 
 
-def test_statement_end_object_without_value_is_loose_only():
+def test_statement_end_object_without_value_is_loose_only() -> None:
     _fail(_Statement, 'END_OBJECT\n', test=1)
     _pass(_Statement, 'END_OBJECT\n', ('END_OBJECT', None), 'END_OBJECT', test=2)
 
 
-def test_end_statement():
+def test_end_statement() -> None:
     _pass(_EndStatement, 'END  \t\r\n', ('END', None), 'END')
 
 

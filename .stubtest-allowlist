@@ -1,0 +1,7 @@
+# Allowlist for `mypy.stubtest`, read by scripts/run-all-checks.sh and CI.
+#
+# The only supported import is "from pdsparser import ...", so __init__.pyi is the only
+# stub and describes the whole public API. The private modules (_PDS3_GRAMMAR,
+# _fast_dict, _utils) carry no stub and are kept out of stubtest's discovery by
+# [tool.mypy] exclude in pyproject.toml, so nothing needs to be accepted here. Add an
+# entry only for a deliberate, documented mismatch between the stub and the runtime.

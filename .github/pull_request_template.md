@@ -38,6 +38,7 @@ Closes #<!-- issue number -->
 ## Checklist
 
 - [ ] Code follows project style (`ruff check`, `flake8`)
+- [ ] Type annotations present and `mypy` passes
 - [ ] No secrets or credentials committed
 - [ ] No warnings or errors introduced (CI, linters, type checking, builds) or justified in Notes
 - [ ] Docstrings and Sphinx docs updated (if applicable)

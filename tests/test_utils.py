@@ -27,16 +27,16 @@ TEST_FILE_DIR = ROOT_DIR / 'test_files'
     TEST_FILE_DIR / 'v1877838443_1.qub',
     TEST_FILE_DIR / 'C3438954.IMQ',             # Vax format
 ], ids=lambda path: pathlib.Path(path).name)
-def test_is_pds3_file(filepath):
+def test_is_pds3_file(filepath: str | pathlib.Path) -> None:
     assert is_pds3_file(filepath)
 
 
 @pytest.mark.parametrize('filename', ['empty.dat', 'pdsdd-short.full', 'IRISHEDR.FMT'])
-def test_is_not_pds3_file(filename):
+def test_is_not_pds3_file(filename: str) -> None:
     assert not is_pds3_file(TEST_FILE_DIR / filename)
 
 
-def test_is_pds3_file_missing():
+def test_is_pds3_file_missing() -> None:
     with pytest.raises(FileNotFoundError):
         is_pds3_file(TEST_FILE_DIR / 'missing.lbl')
 
@@ -46,7 +46,7 @@ def test_is_pds3_file_missing():
 ##########################################################################################
 
 @pytest.mark.parametrize('name', pdsparser.__all__)
-def test_public_api(name):
+def test_public_api(name: str) -> None:
     assert hasattr(pdsparser, name)
 
 
@@ -67,7 +67,7 @@ UNWRAPPED_TABLE = ('Input data type.  Identify input type as follows:\n'
                    ' 00001000 - Internal Simulation.')
 
 
-def test_unwrap_paragraph():
+def test_unwrap_paragraph() -> None:
 
     text = ('\n   \nThis image is the result of geometrically   \n'
             '    correcting the corresponding CALIB image (C3450702_CALIB.IMG).  \n'
@@ -77,7 +77,7 @@ def test_unwrap_paragraph():
                              '(C3450702_CALIB.IMG).')
 
 
-def test_unwrap_explicit_newline_on_every_line():
+def test_unwrap_explicit_newline_on_every_line() -> None:
 
     note = """Input data type.  Identify input type
         as follows:
@@ -95,7 +95,7 @@ def test_unwrap_explicit_newline_on_every_line():
     assert _unwrap(note) == UNWRAPPED_TABLE
 
 
-def test_unwrap_indent_forces_newline():
+def test_unwrap_indent_forces_newline() -> None:
 
     # Indented lines start a new line even without an explicit newline
     note = """Input data type.  Identify input type
@@ -114,7 +114,7 @@ def test_unwrap_indent_forces_newline():
     assert _unwrap(note) == UNWRAPPED_TABLE
 
 
-def test_unwrap_without_blank_line():
+def test_unwrap_without_blank_line() -> None:
 
     note = """Input data type.  Identify input type
         as follows:
@@ -126,7 +126,7 @@ def test_unwrap_without_blank_line():
                              ' 00001000 - Internal Simulation.')
 
 
-def test_unwrap_extra_blank_lines():
+def test_unwrap_extra_blank_lines() -> None:
 
     # Multiple blank lines are reduced to one
     note = """Input data type.  Identify input type
@@ -142,7 +142,7 @@ def test_unwrap_extra_blank_lines():
                              ' 00001000 - Internal Simulation.')
 
 
-def test_unwrap_paragraphs():
+def test_unwrap_paragraphs() -> None:
 
     desc = ('Telemetry format id from the minor frame of this line.\n'
             'Valid is 5-HIS, 6-HMA, 7-HCA, 17-HIM, 22-IM8, 23-AI8, and 25-IM4\n'
