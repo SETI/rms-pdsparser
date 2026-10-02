@@ -11,8 +11,11 @@ on:
     - cron: "21 11 * * 0"
 
 jobs:
+  # The job names "Lint pdsparser" and "Test pdsparser (<os>, <python>)" are the required
+  # status checks in the branch protection of main. Renaming a job leaves its required
+  # check waiting forever, so change the branch protection in the same step.
   lint:
-    name: Lint rms-pdsparser
+    name: Lint pdsparser
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -80,7 +83,7 @@ jobs:
           pymarkdown scan -r docs/ .claude/ README.md CONTRIBUTING.md
 
   test:
-    name: Test rms-pdsparser
+    name: Test pdsparser
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
