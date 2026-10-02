@@ -50,6 +50,10 @@ jobs:
         run: |
           MYPYPATH=src mypy tests
 
+      - name: pip-audit
+        run: |
+          pip-audit --skip-editable
+
       - name: Pyroma
         run: |
           pyroma .
@@ -61,11 +65,15 @@ jobs:
         run: |
           python -m mypy.stubtest pdsparser --mypy-config-file pyproject.toml --allowlist .stubtest-allowlist
 
-      # -W makes warnings errors; docs/conf.py sets nitpicky = True, so a
-      # cross-reference with no target fails the build too.
+      # -W makes warnings errors and -n (nitpicky) makes a cross-reference with no
+      # target one of them.
       - name: Sphinx
         run: |
-          sphinx-build -W -b html docs docs/_build
+          sphinx-build -W -n -b html docs docs/_build
+
+      - name: Codespell
+        run: |
+          codespell src tests docs scripts README.md CONTRIBUTING.md
 
       - name: PyMarkdown
         run: |

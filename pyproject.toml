@@ -72,6 +72,7 @@ write_to = "src/pdsparser/_version.py"
 
 [project.optional-dependencies]
 dev = [
+  "codespell>=2.4",
   "coverage>=7.0",
   "flake8",
   # mypy is not run against src (see CLAUDE.md), but stubtest ships with it
@@ -174,6 +175,30 @@ extend-ignore = ["PT011", "SIM105", "SIM108", "I001", "N999", "RUF005", "RUF022"
 "src/pdsparser/__init__.py" = ["B006"]
 "src/pdsparser/_utils.py" = ["B006", "N806"]
 
+[tool.codespell]
+# Two dictionaries: the default typo list, and the British-to-American list that
+# enforces the spelling rule in .claude/rules/doc_python.md.
+builtin = "clear,en-GB_to_en-US"
+# The builtin British list carries a base word but not every inflection, so it
+# catches `catalogue` and lets `catalogued` through. `.codespell-dictionary.txt`
+# adds the inflections this tree uses, in codespell's `wrong->right` format --
+# one pair per line, no comments or blank lines, which that parser rejects. The
+# `-` is what keeps the builtins above: naming a dictionary without it replaces
+# them rather than extending them, and it trails the filename because a value
+# opening with `-` reads as another flag.
+dictionary = ".codespell-dictionary.txt,-"
+# Split on everything that is not an ASCII letter. The default word pattern
+# keeps hyphens and apostrophes, which hides two whole classes: a compound like
+# `optical-centre` is one unknown token, and -- because this project quotes
+# strings with single quotes -- so is every string literal, `'colour'` included.
+regex = "[a-zA-Z]+"
+skip = "*/.git/*,*/_build/*,*/venv/*,*/.venv/*,*.egg-info,*.lock,*.png,*.jpg,*.svg"
+# Words the dictionaries flag that are correct here. Each is a term of art,
+# an identifier, or a fragment the word pattern above creates -- not an
+# exception granted to avoid fixing a real typo.
+#   indx - an index variable in _PDS3_GRAMMAR.py and _utils.py.
+ignore-words-list = "indx"
+
 [tool.pymarkdown.extensions.front-matter]
 # The rules and skills under .claude/ open with a YAML front-matter block, which would
 # otherwise be read as a setext heading.
@@ -185,17 +210,6 @@ enabled = false
 
 [tool.pymarkdown.plugins.md033]
 # Inline HTML (e.g. <br>) allowed in Markdown.
-enabled = false
-
-[tool.pymarkdown.plugins.md025]
-# Multiple top-level headings. The README uses a level-one heading per major
-# section, and those levels feed the Sphinx TOC through the include in
-# docs/index.rst, so they are deliberate.
-enabled = false
-
-[tool.pymarkdown.plugins.md041]
-# First line must be a top-level heading. The README opens with badges; the
-# Sphinx include starts after the <!-- start-after-point --> marker instead.
 enabled = false
 
 # Uncomment when enabling bandit in [project.optional-dependencies].dev.

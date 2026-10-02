@@ -1,17 +1,18 @@
 ---
-description: Foundation standards for documenting a Python package with Sphinx, ReadTheDocs, and docstrings; shared by the README, user-guide, dev-guide, and how-to rules.
+description: Foundation standards for documenting a Python package with Sphinx, ReadTheDocs, and docstrings; shared by the README, user-guide, dev-guide, and how-to skills.
 ---
 
 # Python Documentation Foundation
 
 This rule defines the documentation system, prose conventions, docstring
 rules, and Sphinx build requirements that apply to **all** documentation in a
-Python package. The companion rules build on it:
+Python package. The companion skills (in `.claude/skills/`, loaded when a task
+calls for them) build on it:
 
-- `doc_readme` — the top-level `README`.
-- `doc_user_guide` — the end-user manual.
-- `doc_dev_guide` — the contributor / maintainer manual and API reference.
-- `doc_how_to` — task-focused how-to articles.
+- `doc-readme` — the top-level `README`.
+- `doc-user-guide` — the end-user manual.
+- `doc-dev-guide` — the contributor / maintainer manual and API reference.
+- `doc-how-to` — task-focused how-to articles.
 
 Read this rule first; the others assume its docstring, cross-reference, prose,
 and build requirements without repeating them.
@@ -30,11 +31,28 @@ and build requirements without repeating them.
 ## 2. Prose Conventions
 
 - One space between a sentence-ending period and the next sentence.
-- American spelling, not British (e.g. `color`, not `colour`).
+- American spelling, not British: `center` not `centre`, `color` not `colour`,
+  `normalize` not `normalise`. Enforced by `codespell`; see the allow-list in
+  `pyproject.toml` for the terms of art it is told to accept. A line that needs
+  a word the gate is right to flag -- a test whose subject is the misspelling,
+  an external API name -- carries an inline `codespell:ignore <word>` with the
+  reason beside it, rather than widening the allow-list for everyone.
 - Define each domain-specific term on first use.
 - Describe the **current** state of the software only. Never anchor prose to a
   moment in time or to migration history: avoid "new", "legacy", "old",
   "now", "recently", "as before", "backwards compatible", and similar framing.
+- Do not cite issue/ticket numbers in documentation prose or in docstrings. Both
+  describe how the software behaves, not the tracker items that shaped it; issue
+  numbers belong in commit messages, PR descriptions, and (only as a supporting
+  reference, never as the whole comment) inline `#` code comments.
+- This prohibition covers the documentation the package publishes: the README,
+  the user and developer guides, the how-to pages, and docstrings. It does not
+  cover `plans/` or `critiques/`, including their `archive/` subdirectories and
+  the README that indexes each one. Those are project records rather than
+  package documentation, and naming the issue that owns a piece of work is what
+  they are for: a plan states which issues a phase closes and which it leaves
+  open, and an archive index states which issues each retired document carried
+  forward. Cite freely there.
 - Do not use unicode smart quotes, em-dashes, or arrows inside `.py` files
   (they are acceptable in `.rst` and `.md`).
 
@@ -128,4 +146,4 @@ sphinx-build -n -b html docs docs/_build   # nitpicky (catches broken xrefs)
 - NEVER leave stale or contradictory documentation. If a feature is removed,
   remove its documentation; if it is renamed, rename every reference.
 - A new public module requires a corresponding API-reference entry so it
-  appears in the rendered API surface (see `doc_dev_guide`).
+  appears in the rendered API surface (see the `doc-dev-guide` skill).

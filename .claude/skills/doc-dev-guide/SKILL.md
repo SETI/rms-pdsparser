@@ -1,8 +1,6 @@
 ---
-description: Format, layout, and completeness rules for the developer/contributor guide of a Python package, covering repository layout, class diagrams, per-module prose, and the API reference.
-paths:
-  - "docs/**/*.rst"
-  - "docs/**/*.md"
+name: doc-dev-guide
+description: Format, layout, and completeness rules for the developer/contributor guide of a Python package, covering repository layout, class diagrams, per-module prose, and the API reference. Use when writing, editing, or reviewing the developer guide or API reference under docs/.
 ---
 
 # Developer Guide

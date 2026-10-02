@@ -18,7 +18,7 @@ Welcome to the Documentation for rms-pdsparser!
    :caption: Project:
 
    contributing
-   CODE_OF_CONDUCT
+   code_of_conduct
 
 Indices and tables
 ==================

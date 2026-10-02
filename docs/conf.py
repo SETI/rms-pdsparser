@@ -99,9 +99,9 @@ intersphinx_mapping = {
     'filecache': ('https://rms-filecache.readthedocs.io/en/latest/', None),
 }
 
-# Nitpicky mode: report every cross-reference that does not resolve. Set here rather
-# than passed as -n so that every build gets it -- the check script, CI, and
-# scripts/read-docs.sh alike -- and none of them can drift out of step.
+# Nitpicky mode: report every cross-reference that does not resolve. The check script,
+# CI, and scripts/read-docs.sh also pass -n, but the ReadTheDocs build takes no extra
+# options, so it gets nitpicky mode only from here.
 nitpicky = True
 
 # The only cross-references that cannot resolve are the informal type words this

@@ -14,8 +14,10 @@
 #   -s, --sequential       Run all requested checks sequentially
 #   -w, --pytest-workers N Pytest workers: auto (default), 1 (serial), or N
 #   -c, --code             Run all code checks (sets each RUN_* code flag true)
-#   -d, --docs             Run Sphinx and PyMarkdown (RUN_SPHINX, RUN_PYMARKDOWN)
-#   -m, --markdown         Run only PyMarkdown (RUN_PYMARKDOWN)
+#   -d, --docs             Run Sphinx, codespell, and PyMarkdown (RUN_SPHINX,
+#                          RUN_CODESPELL, RUN_PYMARKDOWN)
+#   -m, --markdown         Run codespell and PyMarkdown (RUN_CODESPELL,
+#                          RUN_PYMARKDOWN)
 #   --ruff-check           Run ruff check only (may combine with other --* flags)
 #   --ruff-format          Run ruff format --check only
 #   --flake8-cont          Run flake8 continuation-line checks only (E12x, E13x)
@@ -25,7 +27,9 @@
 #   --stubtest             Run stubtest only (checks __init__.pyi)
 #   --bandit               Run bandit only
 #   --vulture              Run vulture only
+#   --pip-audit            Run pip-audit only
 #   --sphinx               Run Sphinx build only
+#   --codespell            Run codespell only
 #   --pymarkdown           Run PyMarkdown scan only
 #   -h, --help             Show this help message
 #
@@ -40,13 +44,15 @@
 #
 #   RUN_* (set by this script from CLI or full-run defaults): RUN_RUFF_CHECK,
 #   RUN_RUFF_FORMAT, RUN_FLAKE8_CONT, RUN_MYPY, RUN_PYTEST, RUN_PYROMA,
-#   RUN_STUBTEST, RUN_BANDIT, RUN_VULTURE, RUN_SPHINX, RUN_PYMARKDOWN
+#   RUN_STUBTEST, RUN_BANDIT, RUN_VULTURE, RUN_PIP_AUDIT, RUN_SPHINX,
+#   RUN_CODESPELL, RUN_PYMARKDOWN
 #
-#   Per-check toggles (true/false). Defaults favor a minimal CI set; export to
-#   enable more tools in a given repo. Each check runs only if both RUN_* and
-#   ENABLE_* are true (RUN_* from CLI or defaults below; ENABLE_* from env):
+#   Per-check toggles (true/false). The defaults match the checks in the
+#   template's CI workflow; change them here (and in CI) for a given repo, or
+#   export them to override a single run. Each check runs only if both RUN_*
+#   and ENABLE_* are true (RUN_* from CLI or defaults below; ENABLE_* from env):
 #     ENABLE_RUFF_CHECK   (default: true)
-#     ENABLE_RUFF_FORMAT  (default: false)
+#     ENABLE_RUFF_FORMAT  off: it would remove deliberate alignment (default: false)
 #     ENABLE_FLAKE8_CONT  continuation-line indent, E12x/E13x (default: true)
 #     ENABLE_MYPY         mypy on tests/ only (default: true)
 #     ENABLE_PYTEST       (default: true)
@@ -54,17 +60,19 @@
 #     ENABLE_STUBTEST     __init__.pyi matches the runtime API (default: true)
 #     ENABLE_BANDIT       (default: false)
 #     ENABLE_VULTURE      (default: false)
+#     ENABLE_PIP_AUDIT    (default: true)
 #     ENABLE_SPHINX       (default: true)
+#     ENABLE_CODESPELL    codespell spelling gate (default: true)
 #     ENABLE_PYMARKDOWN   PyMarkdown scan (default: true)
 #
-# Checks (each run separately; -d runs both Sphinx and Markdown):
+# Checks (each run separately; -d runs Sphinx and the text checks):
 #   Code:     optional: ruff check, ruff format --check, flake8 continuation-line
-#             indent, mypy, pytest, pyroma, stubtest, bandit, vulture (see
-#             ENABLE_* above). Ruff implements no E12x/E13x rule, so the
+#             indent, mypy, pytest, pyroma, stubtest, bandit, vulture, pip-audit
+#             (see ENABLE_* above). Ruff implements no E12x/E13x rule, so the
 #             continuation-line indent checks come from flake8 instead.
-#   Sphinx:   make -C docs html SPHINXOPTS="-W". docs/conf.py sets nitpicky = True,
-#             so unresolved cross-references are errors here too.
-#   Markdown: pymarkdown scan -r docs/ .claude/ README.md CONTRIBUTING.md
+#   Sphinx:   make -C docs html SPHINXOPTS="-W -n"
+#   Text:     codespell src/ tests/ docs/ scripts/ README.md CONTRIBUTING.md
+#             pymarkdown scan -r docs/ .claude/ README.md CONTRIBUTING.md
 #
 # Exit codes:
 #   0 - All requested checks passed
@@ -93,7 +101,9 @@ RUN_PYROMA=false
 RUN_STUBTEST=false
 RUN_BANDIT=false
 RUN_VULTURE=false
+RUN_PIP_AUDIT=false
 RUN_SPHINX=false
+RUN_CODESPELL=false
 RUN_PYMARKDOWN=false
 SCOPE_SPECIFIED=false
 
@@ -108,7 +118,9 @@ SCOPE_SPECIFIED=false
 : "${ENABLE_STUBTEST:=true}"
 : "${ENABLE_BANDIT:=false}"
 : "${ENABLE_VULTURE:=false}"
+: "${ENABLE_PIP_AUDIT:=true}"
 : "${ENABLE_SPHINX:=true}"
+: "${ENABLE_CODESPELL:=true}"
 : "${ENABLE_PYMARKDOWN:=true}"
 
 # Get script directory and project root
@@ -228,16 +240,19 @@ while [[ $# -gt 0 ]]; do
             RUN_STUBTEST=true
             RUN_BANDIT=true
             RUN_VULTURE=true
+            RUN_PIP_AUDIT=true
             SCOPE_SPECIFIED=true
             shift
             ;;
         -d|--docs)
             RUN_SPHINX=true
+            RUN_CODESPELL=true
             RUN_PYMARKDOWN=true
             SCOPE_SPECIFIED=true
             shift
             ;;
         -m|--markdown)
+            RUN_CODESPELL=true
             RUN_PYMARKDOWN=true
             SCOPE_SPECIFIED=true
             shift
@@ -287,8 +302,18 @@ while [[ $# -gt 0 ]]; do
             SCOPE_SPECIFIED=true
             shift
             ;;
+        --pip-audit)
+            RUN_PIP_AUDIT=true
+            SCOPE_SPECIFIED=true
+            shift
+            ;;
         --sphinx)
             RUN_SPHINX=true
+            SCOPE_SPECIFIED=true
+            shift
+            ;;
+        --codespell)
+            RUN_CODESPELL=true
             SCOPE_SPECIFIED=true
             shift
             ;;
@@ -320,7 +345,9 @@ if [ "$SCOPE_SPECIFIED" = false ]; then
     RUN_STUBTEST=true
     RUN_BANDIT=true
     RUN_VULTURE=true
+    RUN_PIP_AUDIT=true
     RUN_SPHINX=true
+    RUN_CODESPELL=true
     RUN_PYMARKDOWN=true
 fi
 
@@ -348,10 +375,11 @@ _code_checks_any_scheduled() {
     [ "$RUN_STUBTEST" = true ] && [ "$ENABLE_STUBTEST" = true ] && return 0
     [ "$RUN_BANDIT" = true ] && [ "$ENABLE_BANDIT" = true ] && return 0
     [ "$RUN_VULTURE" = true ] && [ "$ENABLE_VULTURE" = true ] && return 0
+    [ "$RUN_PIP_AUDIT" = true ] && [ "$ENABLE_PIP_AUDIT" = true ] && return 0
     return 1
 }
 
-# ---- Code checks (ruff, mypy, pytest, pyroma, bandit, vulture) ----
+# ---- Code checks (ruff, mypy, pytest, pyroma, bandit, vulture, pip-audit) ----
 run_code_checks() {
     local output_file="${1:-}"
     local status_file="${2:-}"
@@ -486,6 +514,19 @@ run_code_checks() {
         fi
     fi
 
+    # --skip-editable skips the package itself, which is installed in editable
+    # mode; every other package in the environment is checked.
+    if [ "$RUN_PIP_AUDIT" = true ] && [ "$ENABLE_PIP_AUDIT" = true ]; then
+        print_info "Running pip-audit (known vulnerabilities in dependencies)..."
+        if python -m pip_audit --skip-editable; then
+            print_success "pip-audit passed"
+        else
+            print_error "pip-audit failed"
+            failed=true
+            failed_checks="${failed_checks}Code - pip-audit"$'\n'
+        fi
+    fi
+
     deactivate 2>/dev/null || true
 
     if [ "$failed" = true ]; then
@@ -517,8 +558,8 @@ run_sphinx_build() {
     # shellcheck source=/dev/null
     source "$VENV/bin/activate"
 
-    print_info "Building documentation (warnings and unresolved refs are errors)..."
-    if (cd docs && make clean && make html SPHINXOPTS="-W"); then
+    print_info "Building documentation (nitpicky, warnings treated as errors)..."
+    if (cd docs && make clean && make html SPHINXOPTS="-W -n"); then
         print_success "Sphinx build passed"
         deactivate 2>/dev/null || true
         return 0
@@ -530,7 +571,14 @@ run_sphinx_build() {
     fi
 }
 
-# ---- Markdown lint only (PyMarkdown) ----
+# ---- Text checks (codespell, PyMarkdown) ----
+# True if at least one text check is both selected (RUN_*) and enabled (ENABLE_*).
+_text_checks_any_scheduled() {
+    [ "$RUN_CODESPELL" = true ] && [ "$ENABLE_CODESPELL" = true ] && return 0
+    [ "$RUN_PYMARKDOWN" = true ] && [ "$ENABLE_PYMARKDOWN" = true ] && return 0
+    return 1
+}
+
 run_markdown_checks() {
     local output_file="${1:-}"
     local status_file="${2:-}"
@@ -539,7 +587,7 @@ run_markdown_checks() {
         exec > "$output_file" 2>&1
     fi
 
-    print_section "Markdown Lint (PyMarkdown)"
+    print_section "Text Checks (codespell, PyMarkdown)"
 
     cd "$PROJECT_ROOT" || exit 1
 
@@ -552,27 +600,58 @@ run_markdown_checks() {
     # shellcheck source=/dev/null
     source "$VENV/bin/activate"
 
-    print_info "Running PyMarkdown scan (docs/, .claude/, root *.md)..."
-    local scan_paths=()
-    [ -d "docs/" ] && scan_paths+=("docs/")
-    [ -d ".claude/" ] && scan_paths+=(".claude/")
-    [ -f "README.md" ] && scan_paths+=("README.md")
-    [ -f "CONTRIBUTING.md" ] && scan_paths+=("CONTRIBUTING.md")
-    if [ ${#scan_paths[@]} -eq 0 ]; then
-        print_info "No Markdown files/directories found to scan"
-        deactivate 2>/dev/null || true
-        return 0
+    local codespell_failed=false
+    local pymarkdown_failed=false
+
+    if [ "$RUN_CODESPELL" = true ] && [ "$ENABLE_CODESPELL" = true ]; then
+        print_info "Running codespell (typos and British spellings)..."
+        local spell_paths=()
+        local path
+        for path in src/ tests/ docs/ scripts/ README.md CONTRIBUTING.md; do
+            [ -e "$path" ] && spell_paths+=("$path")
+        done
+        if [ ${#spell_paths[@]} -eq 0 ]; then
+            print_info "No files found to spell-check"
+        elif python -m codespell_lib "${spell_paths[@]}"; then
+            print_success "codespell passed"
+        else
+            print_error "codespell failed"
+            codespell_failed=true
+        fi
     fi
-    if python -m pymarkdown scan -r "${scan_paths[@]}"; then
-        print_success "PyMarkdown scan passed"
-        deactivate 2>/dev/null || true
-        return 0
-    else
-        print_error "PyMarkdown scan failed"
-        [ -n "$status_file" ] && echo "Markdown - PyMarkdown scan" >> "$status_file"
-        deactivate 2>/dev/null || true
+
+    if [ "$RUN_PYMARKDOWN" = true ] && [ "$ENABLE_PYMARKDOWN" = true ]; then
+        print_info "Running PyMarkdown scan (docs/, .claude/, root *.md)..."
+        local scan_paths=()
+        [ -d "docs/" ] && scan_paths+=("docs/")
+        [ -d ".claude/" ] && scan_paths+=(".claude/")
+        [ -f "README.md" ] && scan_paths+=("README.md")
+        [ -f "CONTRIBUTING.md" ] && scan_paths+=("CONTRIBUTING.md")
+        if [ ${#scan_paths[@]} -eq 0 ]; then
+            print_info "No Markdown files/directories found to scan"
+        elif python -m pymarkdown scan -r "${scan_paths[@]}"; then
+            print_success "PyMarkdown scan passed"
+        else
+            print_error "PyMarkdown scan failed"
+            pymarkdown_failed=true
+        fi
+    fi
+
+    deactivate 2>/dev/null || true
+
+    # In parallel mode this lane runs in a subshell, so an append to
+    # FAILED_CHECKS dies with it and status_file is the only channel the parent
+    # sees. The return value has to cover both checks: returning 0 because
+    # PyMarkdown passed is how a spelling failure would leave the run green.
+    if [ "$codespell_failed" = true ] || [ "$pymarkdown_failed" = true ]; then
+        if [ -n "$status_file" ]; then
+            [ "$codespell_failed" = true ] && echo "Markdown - codespell" >> "$status_file"
+            [ "$pymarkdown_failed" = true ] && echo "Markdown - PyMarkdown scan" >> "$status_file"
+        fi
         return 1
     fi
+
+    return 0
 }
 
 # ---- Collect status from a status file into FAILED_CHECKS ----
@@ -611,7 +690,7 @@ if [ "$PARALLEL" = true ]; then
         pids+=($!)
     fi
 
-    if [ "$RUN_PYMARKDOWN" = true ] && [ "$ENABLE_PYMARKDOWN" = true ]; then
+    if _text_checks_any_scheduled; then
         markdown_output="$TEMP_DIR/markdown.log"
         markdown_status="$TEMP_DIR/markdown.status"
         temp_files+=("$markdown_output")
@@ -658,7 +737,7 @@ else
         _collect_status "$sphinx_status"
     fi
 
-    if [ "$RUN_PYMARKDOWN" = true ] && [ "$ENABLE_PYMARKDOWN" = true ]; then
+    if _text_checks_any_scheduled; then
         markdown_status="$TEMP_DIR/markdown.status"
         if ! run_markdown_checks "" "$markdown_status"; then
             EXIT_CODE=1

@@ -1,3 +1,7 @@
+# rms-pdsparser
+
+<!-- pyml disable MD025 -->
+
 [![GitHub release; latest by date](https://img.shields.io/github/v/release/SETI/rms-pdsparser)](https://github.com/SETI/rms-pdsparser/releases)
 [![GitHub Release Date](https://img.shields.io/github/release-date/SETI/rms-pdsparser)](https://github.com/SETI/rms-pdsparser/releases)
 [![Test Status](https://img.shields.io/github/actions/workflow/status/SETI/rms-pdsparser/run-tests.yml?branch=main)](https://github.com/SETI/rms-pdsparser/actions)
@@ -212,7 +216,7 @@ The returned section of the dictionary will look like this:
 
 # Example 3
 
-"Set" notation (using curly braces "{}") was sometimes mis-used in PDS3 labels where
+"Set" notation (using curly braces "{}") was sometimes misused in PDS3 labels where
 "sequence" notation (using parentheses "()") was meant. For example, this might appear in
 a label:
 

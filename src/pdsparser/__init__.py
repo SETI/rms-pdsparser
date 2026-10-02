@@ -171,7 +171,7 @@ The returned section of the dictionary will look like this::
 Example 3
 #########
 
-"Set" notation (using curly braces "{}") was sometimes mis-used in PDS3 labels where
+"Set" notation (using curly braces "{}") was sometimes misused in PDS3 labels where
 "sequence" notation (using parentheses "()") was meant. For example, this might appear in
 a label::
 
@@ -386,7 +386,7 @@ class Pds3Label:
             datetime module. Dates and date-times have an additional dictionary entry
             using suffix "_day" returning the elapsed days since January 1, 2000. Times
             and date-times have an additional entry using suffix "_sec" returning the
-            number of elapsed seconds since the beginning of that day. In additiona, all
+            number of elapsed seconds since the beginning of that day. In addition, all
             of these have an additional entry with suffix
 
             Sequences are represented by lists. 2-D sequences are represented by list of
@@ -396,7 +396,7 @@ class Pds3Label:
             value associated with each value in the sequence.
 
             Set values (enclosed in curly braces {}) are represented by Python set
-            objects. However, because this notation was sometimes mis-used in labels for
+            objects. However, because this notation was sometimes misused in labels for
             values that should have been given as sequences, you can also view these
             values as an ordered list by appending "_list" to the key.
 
@@ -677,7 +677,7 @@ class Pds3Label:
     def as_dict(self):
         """This label as a Python dictionary. Part of the old PdsLabel API.
 
-        DEPRECATED; use the `dict_` attribute or apply the dict API directoy to this
+        DEPRECATED; use the `dict_` attribute or apply the dict API directly to this
         Pds3Label object.
 
         Note that this function matches the previous output of as_dict(). Specifically,

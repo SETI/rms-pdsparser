@@ -8,11 +8,11 @@ dictionaries. Single package, `src/` layout.
 ## Detailed rules
 
 `.claude/rules/*.md` hold the authoritative detailed standards (Python style, testing,
-documentation, dependencies, environment) and load automatically. The `doc_*` and
-`how_to` rules are scoped to the files they govern, so they load only when you touch
-`README.md` or `docs/`. Process standards live in `.claude/skills/` and load on demand:
-`git-workflow`, `pull-request`, `bug-report`. This file records only what is specific to
-this repository or what you would otherwise get wrong.
+documentation, dependencies, environment) and load automatically. The standards for each
+kind of document build on `doc_python` and live in `.claude/skills/`, loaded on demand:
+`doc-readme`, `doc-user-guide`, `doc-dev-guide`, `doc-how-to`. So do the process
+standards: `git-workflow`, `pull-request`, `bug-report`. This file records only what is
+specific to this repository or what you would otherwise get wrong.
 
 ## Verifying changes
 
@@ -25,6 +25,11 @@ must run exactly that set. Run it before calling a change done.
   check such as `--pytest`, `--ruff-check`, `--mypy` or `--stubtest`.
 - `ruff format`, `bandit`, and `vulture` are disabled by default in the script. Leave them
   disabled, and don't run `ruff format` over the tree: the source has not been reformatted.
+- `codespell` enforces American spelling as well as typos. A word it flags that is correct
+  here goes in `ignore-words-list` in `pyproject.toml` with its reason; a one-off goes on
+  its own line as `codespell:ignore <word>`.
+- `pip-audit` runs in the check script and CI, so a newly published advisory against an
+  installed dependency fails the run until its minimum version is raised.
 
 ## Python style
 
@@ -60,7 +65,8 @@ must run exactly that set. Run it before calling a change done.
 
 ## Documentation
 
-Sphinx builds with `-W` and `nitpicky = True`, so any warning or unresolved cross-reference
+Sphinx builds with `-W -n` in CI, the check script, and `read-docs.sh`, and `docs/conf.py`
+also sets `nitpicky = True` for ReadTheDocs, so any warning or unresolved cross-reference
 in a docstring fails the build. `docs/index.rst` includes `README.md` after the
 `<!-- start-after-point -->` marker, so README headings feed the Sphinx TOC.
 
