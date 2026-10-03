@@ -171,7 +171,7 @@ The returned section of the dictionary will look like this::
 Example 3
 #########
 
-"Set" notation (using curly braces "{}") was sometimes mis-used in PDS3 labels where
+"Set" notation (using curly braces "{}") was sometimes misused in PDS3 labels where
 "sequence" notation (using parentheses "()") was meant. For example, this might appear in
 a label::
 
@@ -202,7 +202,6 @@ parse the label and present its content.
   dictionary using the keyword plus suffix "_source".
 * Use `expand=True` to insert the content of any referenced `^STRUCTURE` keywords into the
   returned dictionary.
-* Use `vax=True` to read attached labels from old-style Vax variable-length record files.
 * Use the `repairs` to correct any known syntax errors in the label prior to parsing using
   regular expressions.
 
@@ -210,7 +209,8 @@ Four methods of parsing the label are provided.
 
 * `method="strict"` uses a strict implementation of the PDS3 syntax. It is sure to provide
   accurate results, but can be rather slow. This method can also be used to validate the
-  syntax within a PDS3 label, because it will raise a SyntaxError if anything goes wrong.
+  syntax within a PDS3 label, because it will raise a PdsSyntaxError if anything goes
+  wrong.
 * `method="loose"` uses a variant of the "strict" method, in which allowance is made for
   certain common syntax errors. Specifically,
 
@@ -238,12 +238,16 @@ Utilities
 
 The `pdsparser` module provides several additional utilities for handling PDS3 labels.
 
-- :meth:`~utils.read_label`: Reads a PDS3 label from a file. Supports attached labels
-  within binary files.
-- :meth:`~utils.read_vax_binary_label`: Reads the attached PDS3 label from an old-style
-  Vax binary file that uses variable-length records.
-- :meth:`~utils.expand_structures`: Replaces any `^STRUCTURE` keywords in a label string
-  with the content of the associated ".FMT" files.
+- :func:`read_label`: Reads a PDS3 label from a file. Supports attached labels within
+  binary files.
+- :func:`read_vax_binary_label`: Reads the attached PDS3 label from an old-style Vax
+  binary file that uses variable-length records.
+- :func:`expand_structures`: Replaces any `^STRUCTURE` keywords in a label string with the
+  content of the associated ".FMT" files.
+- :func:`is_pds3_file`: Returns True if a file appears to contain a PDS3 label, either
+  attached or detached.
+- :func:`is_pds3_vax_file`: Returns True if a file contains a PDS3 label and uses
+  old-style Vax variable-length records.
 """
 
 import datetime as dt
@@ -257,9 +261,13 @@ try:
 except ImportError:         # pragma: no cover
     __version__ = 'Version unspecified'
 
-from .utils import read_label, read_vax_binary_label, expand_structures, _unique_key
 from ._fast_dict import _fast_dict
+from ._utils import (expand_structures, is_pds3_file, is_pds3_vax_file, read_label,
+                     read_vax_binary_label, PdsError, PdsSyntaxError, _unique_key)
 from ._PDS3_GRAMMAR import _PDS3_LABEL, _ALT_PDS3_LABEL, _COMPOUND_LABEL
+
+__all__ = ['expand_structures', 'is_pds3_file', 'is_pds3_vax_file', 'read_label',
+           'read_vax_binary_label', 'PdsError', 'PdsSyntaxError', 'Pds3Label', 'PdsLabel']
 
 _PARSERS = {'strict': _PDS3_LABEL, 'loose': _ALT_PDS3_LABEL, 'compound': _COMPOUND_LABEL}
 
@@ -267,7 +275,7 @@ _PARSERS = {'strict': _PDS3_LABEL, 'loose': _ALT_PDS3_LABEL, 'compound': _COMPOU
 # Pds3Label
 ##########################################################################################
 
-class Pds3Label():
+class Pds3Label:
     """Class representing the parsed content of a PDS3 label."""
 
     def __init__(self, label, method='strict', *, expand=False, fmt_dirs=[],
@@ -276,7 +284,7 @@ class Pds3Label():
         """Constructor for a Pds3Label.
 
         Parameters:
-            label (str, list, pathlib.Path, or filecache.FCPath):
+            label (str | list[str] | Path | FCPath):
                 The label, defined as a path to a file or as the content of a label. The
                 content can be represented by a single string with <LF> or <CR><LF>
                 terminators, or as a list of strings with optional terminators. If the
@@ -304,12 +312,12 @@ class Pds3Label():
                 True to replace the content of any ^STRUCTURE keyword in the label with
                 the content of the associated ".FMT" file.
 
-            fmt_dirs (str, pathlib.Path, filecache.FCPath, or list, optional):
+            fmt_dirs (str | Path | FCPath | list[str | Path | FCPath], optional):
                 One or more directory paths to search for ".FMT" files. Note that if
                 `label` indicates a file path, the parent directory of that file is always
                 searched first.
 
-            repairs (tuple or list[tuple]):
+            repairs (tuple[str, str] | list[tuple[str, str]], optional):
                 One or more two-element tuples of the form (pattern, replacement), where
                 the first item is a regular expression and the second is the string with
                 which to replace it. These repair patterns are applied to the label
@@ -325,7 +333,9 @@ class Pds3Label():
                 expressions for more details.
 
             vax (bool, optional):
-                True to read an attached label from a Vax binary file.
+                True to read an attached label from a Vax binary, variable-length record
+                file. The file is now automatically checked for this format, so this
+                option is no longer strictly necessary.
 
             types (bool, optional):
                 If True, for each PDS keyword in the label, there will be an extra key in
@@ -350,7 +360,7 @@ class Pds3Label():
 
         Raises:
             FileNotFoundError: If the label file is missing.
-            SyntaxError: If the label content contains invalid syntax.
+            PdsSyntaxError: If the label content contains invalid PDS label syntax.
 
         Notes:
             The label information is preserved as a dictionary using the value before
@@ -376,7 +386,7 @@ class Pds3Label():
             datetime module. Dates and date-times have an additional dictionary entry
             using suffix "_day" returning the elapsed days since January 1, 2000. Times
             and date-times have an additional entry using suffix "_sec" returning the
-            number of elapsed seconds since the beginning of that day. In additiona, all
+            number of elapsed seconds since the beginning of that day. In addition, all
             of these have an additional entry with suffix
 
             Sequences are represented by lists. 2-D sequences are represented by list of
@@ -386,7 +396,7 @@ class Pds3Label():
             value associated with each value in the sequence.
 
             Set values (enclosed in curly braces {}) are represented by Python set
-            objects. However, because this notation was sometimes mis-used in labels for
+            objects. However, because this notation was sometimes misused in labels for
             values that should have been given as sequences, you can also view these
             values as an ordered list by appending "_list" to the key.
 
@@ -402,14 +412,16 @@ class Pds3Label():
             dict (dict): The actual dictionary containing all the label content. However,
                 note that most of the Python dictionary API is implemented directly by
                 this class, so label[keyword] is the same as label.dict[keyword].
+            filepath (FCPath | None): The path to the label file; None if `label`
+                contains label content rather than a file path.
         """
 
         if method not in {'strict', 'loose', 'compound', 'fast'}:
             raise ValueError('invalid method: ' + repr(method))
 
-        self._filepath = ''
         self._fast = (method == 'fast')
         self.content = ''
+        self.filepath = None
 
         # Interpret `label` input
         if isinstance(label, list):
@@ -419,20 +431,22 @@ class Pds3Label():
             if '\n' in label:
                 self.content = label
             else:
-                self._filepath = FCPath(label)
+                self.filepath = FCPath(label)
         elif isinstance(label, (pathlib.Path, FCPath)):
-            self._filepath = FCPath(label)
+            self.filepath = FCPath(label)
         else:
             raise ValueError('invalid label')
 
+        self._filepath = self.filepath      # for backward compatibility
+
         # Read the label content if necessary
-        if self._filepath:
+        if self.filepath:
             if vax:
-                self.content = read_vax_binary_label(self._filepath)
+                self.content = read_vax_binary_label(self.filepath)
             elif method == 'compound':
-                self.content = FCPath(self._filepath).read_text(encoding='latin-1')
+                self.content = FCPath(self.filepath).read_text(encoding='latin-1')
             else:
-                self.content = read_label(self._filepath)
+                self.content = read_label(self.filepath)
 
         # Repair content if necessary
         # We need to repair the content before expanding structures in case the repair
@@ -445,7 +459,7 @@ class Pds3Label():
         # Replace ^STRUCTURE if necessary
         if expand:
             self.content = expand_structures(self.content, fmt_dirs=fmt_dirs,
-                                             repairs=repairs, label_path=self._filepath)
+                                             repairs=repairs, label_path=self.filepath)
 
         # Parse label
         if method == 'fast':
@@ -455,11 +469,11 @@ class Pds3Label():
         else:
             try:
                 self._statements = _PARSERS[method].parse_string(self.content)
-            except ParseException as err:       # convert parse exception to SyntaxError
+            except ParseException as err:   # convert parse exception to PdsSyntaxError
                 message = str(err)
                 if message[:2] == ', ':
                     message = message[2:]
-                raise SyntaxError(message)
+                raise PdsSyntaxError(message) from err
 
             self.dict = self._python_dict(types=types, sources=sources,
                                           first_suffix=first_suffix, details=_details)
@@ -574,7 +588,7 @@ class Pds3Label():
             # Check for END_OBJECT without OBJECT
             tail = '' if item is None else ' = ' + item.value
             if name[4:] not in dict_:
-                raise SyntaxError(f'unbalanced {name}{tail}')
+                raise PdsSyntaxError(f'unbalanced {name}{tail}')
 
             # Get a missing value for END_OBJECT or END_GROUP
             if item is None:
@@ -584,7 +598,7 @@ class Pds3Label():
 
             # Check for OBJECT/END_OBJECT mismatch
             if item.value != dict_[name[4:]].value:
-                raise SyntaxError(f'unbalanced {name}{tail}')
+                raise PdsSyntaxError(f'unbalanced {name}{tail}')
 
             # Pop this dictionary and insert it into the higher-level dictionary
             dict_ = dict_list.pop()
@@ -595,8 +609,8 @@ class Pds3Label():
             dict_list[-1][key] = dict_
 
         if len(dict_list) > 1:
-            name = list(dict_list[-1].keys())[0]    # dicts preserve key order
-            raise SyntaxError(f'missing END_{name}')
+            name = next(iter(dict_list[-1]))    # dicts preserve key order
+            raise PdsSyntaxError(f'missing END_{name}')
 
         return apply_first_suffix(dict_list[0], dup_sets[0])
 
@@ -663,7 +677,7 @@ class Pds3Label():
     def as_dict(self):
         """This label as a Python dictionary. Part of the old PdsLabel API.
 
-        DEPRECATED; use the `dict_` attribute or apply the dict API directoy to this
+        DEPRECATED; use the `dict_` attribute or apply the dict API directly to this
         Pds3Label object.
 
         Note that this function matches the previous output of as_dict(). Specifically,

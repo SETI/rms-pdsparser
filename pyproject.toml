@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools", "setuptools_scm[toml]"]
+requires = ["setuptools>=77", "setuptools_scm[toml]"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -7,13 +7,17 @@ name = "rms-pdsparser"
 dynamic = ["version"]
 description = "Routines for parsing PDS3 labels"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.11"
 dependencies = [
   "pyparsing",
   "rms-filecache",
   "rms-julian"
 ]
-license = {text = "Apache-2.0"}
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [
+  {name = "Mark Showalter", email = "mshowalter@seti.org"}
+]
 maintainers = [
   {name = "Robert S. French", email = "rfrench@seti.org"}
 ]
@@ -25,9 +29,6 @@ classifiers = [
   "Topic :: Scientific/Engineering :: Astronomy",
   "Topic :: Software Development :: Libraries :: Python Modules",
   "Topic :: Utilities",
-  "License :: OSI Approved :: Apache Software License",
-  "Programming Language :: Python :: 3.9",
-  "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
@@ -38,13 +39,186 @@ classifiers = [
 
 [project.urls]
 Homepage = "https://github.com/SETI/rms-pdsparser"
+Documentation = "https://rms-pdsparser.readthedocs.io/en/latest"
 Repository = "https://github.com/SETI/rms-pdsparser"
 Source = "https://github.com/SETI/rms-pdsparser"
 Issues = "https://github.com/SETI/rms-pdsparser/issues"
 
+[tool.pytest.ini_options]
+pythonpath = [
+  "src"
+]
+testpaths = ["tests"]
+addopts = ["-n", "auto", "--cov=src/pdsparser", "--strict-markers", "--strict-config"]
+markers = []
+filterwarnings = [
+  "error",
+  # python-dateutil, imported by rms-julian, calls utcfromtimestamp() at import time
+  "ignore:datetime.datetime.utcfromtimestamp:DeprecationWarning:dateutil.*",
+]
+
 [tool.setuptools]
-packages = ["pdsparser"]
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+# PEP 561 marker and type stub must be shipped in the wheel, or downstream type
+# checkers ignore them.
+pdsparser = ["py.typed", "*.pyi"]
 
 [tool.setuptools_scm]
 local_scheme = "no-local-version"
-write_to = "pdsparser/_version.py"
+write_to = "src/pdsparser/_version.py"
+
+[project.optional-dependencies]
+dev = [
+  "codespell>=2.4",
+  "coverage>=7.0",
+  "flake8",
+  # mypy is not run against src (see CLAUDE.md), but stubtest ships with it
+  "mypy>=1.0",
+  "pip-audit>=2.7",
+  "pymarkdownlnt>=0.9.35",
+  "pytest>=7.0",
+  "pytest-cov>=4.0",
+  "pytest-xdist>=3.8.0",
+  "ruff>=0.8",
+  # "bandit[toml]>=1.8",
+  "pyroma>=4.2",
+  # "vulture>=2.14",
+  "rms-pdsparser[docs]",
+]
+docs = [
+  "myst-parser",
+  "sphinx",
+  "sphinx-rtd-theme",
+]
+
+# Tool configuration
+
+[tool.coverage.run]
+branch = true
+parallel = true
+# Must match --cov in the pytest addopts above, or fail_under measures something else
+source = ["src/pdsparser"]
+omit = ["tests/*", "_version.py"]
+
+[tool.coverage.report]
+exclude_lines = [
+  "pragma: no cover",
+  "def __repr__",
+  "raise NotImplementedError",
+]
+fail_under = 90
+
+[tool.mypy]
+strict = true
+# stubtest discovers every module under the package and would compare each unannotated
+# .py module against itself. Only __init__.pyi carries type information, so every other
+# module is excluded from discovery; the overrides below keep mypy from following an
+# import into one of them.
+exclude = [
+  'pdsparser/(_PDS3_GRAMMAR|_fast_dict|_utils)\.py$',
+]
+
+[[tool.mypy.overrides]]
+module = "pdsparser._version"
+ignore_missing_imports = true
+
+# The published type information lives in __init__.pyi, because the only supported
+# import is "from pdsparser import ...". Every other module is private, deliberately
+# unannotated, and has no stub, so mypy must not be turned loose on it. These overrides
+# keep mypy to the stub, which is what `mypy.stubtest` needs in order to run.
+[[tool.mypy.overrides]]
+module = [
+  "pdsparser._PDS3_GRAMMAR",
+  "pdsparser._fast_dict",
+  "pdsparser._utils",
+]
+follow_imports = "skip"
+ignore_errors = true
+
+[tool.ruff]
+target-version = "py311"
+# Must match max-line-length in .flake8.
+line-length = 90
+
+[tool.ruff.format]
+quote-style = "single"
+
+[tool.ruff.lint]
+# Explicit rule set (recommended for library projects). Categories:
+# E, W = pycodestyle errors/warnings; F = Pyflakes; I = isort; UP = pyupgrade;
+# B = bugbear; SIM = simplify; C4 = comprehensions; A = builtins (no shadowing);
+# N = pep8-naming; PT = pytest-style; RUF = Ruff-specific (e.g. unused noqa).
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "C4", "A", "N", "PT", "RUF"]
+# PT011 - pytest.raises is too broad.
+# SIM105 - Use contextlib.suppress for suppressions.
+# SIM108 - Use ternary operator for simple if/else.
+# I001 - Import sorting.
+# N999 - Invalid module name. _PDS3_GRAMMAR.py and test_PDS3_GRAMMAR.py are named for
+#   the grammar they implement and test.
+# RUF005 - Collection literal concatenation. `suffixes + ('unit',)` reads as clearly
+#   as the unpacking form the rule proposes.
+# RUF022 - Unsorted __all__. The order of __all__ is deliberate.
+extend-ignore = ["PT011", "SIM105", "SIM108", "I001", "N999", "RUF005", "RUF022"]
+
+[tool.ruff.lint.per-file-ignores]
+# E501: test files are exempt from the line length limit so that expected-value
+#   tables can stay aligned and readable.
+"tests/*" = ["E501"]
+
+# B006: the list defaults of fmt_dirs and repairs are part of the documented API
+#   and are never mutated.
+# N806: compiled regular expressions keep constant-style names even when they are
+#   local to a function.
+"src/pdsparser/__init__.py" = ["B006"]
+"src/pdsparser/_utils.py" = ["B006", "N806"]
+
+[tool.codespell]
+# Two dictionaries: the default typo list, and the British-to-American list that
+# enforces the spelling rule in .claude/rules/doc_python.md.
+builtin = "clear,en-GB_to_en-US"
+# The builtin British list carries a base word but not every inflection, so it
+# catches `catalogue` and lets `catalogued` through. `.codespell-dictionary.txt`
+# adds the inflections this tree uses, in codespell's `wrong->right` format --
+# one pair per line, no comments or blank lines, which that parser rejects. The
+# `-` is what keeps the builtins above: naming a dictionary without it replaces
+# them rather than extending them, and it trails the filename because a value
+# opening with `-` reads as another flag.
+dictionary = ".codespell-dictionary.txt,-"
+# Split on everything that is not an ASCII letter. The default word pattern
+# keeps hyphens and apostrophes, which hides two whole classes: a compound like
+# `optical-centre` is one unknown token, and -- because this project quotes
+# strings with single quotes -- so is every string literal, `'colour'` included.
+regex = "[a-zA-Z]+"
+skip = "*/.git/*,*/_build/*,*/venv/*,*/.venv/*,*.egg-info,*.lock,*.png,*.jpg,*.svg"
+# Words the dictionaries flag that are correct here. Each is a term of art,
+# an identifier, or a fragment the word pattern above creates -- not an
+# exception granted to avoid fixing a real typo.
+#   indx - an index variable in _PDS3_GRAMMAR.py and _utils.py.
+ignore-words-list = "indx"
+
+[tool.pymarkdown.extensions.front-matter]
+# The rules and skills under .claude/ open with a YAML front-matter block, which would
+# otherwise be read as a setext heading.
+enabled = true
+
+[tool.pymarkdown.plugins.md013]
+# Line length (disable so README/CONTRIBUTING can use longer lines).
+enabled = false
+
+[tool.pymarkdown.plugins.md033]
+# Inline HTML (e.g. <br>) allowed in Markdown.
+enabled = false
+
+# Uncomment when enabling bandit in [project.optional-dependencies].dev.
+# [tool.bandit]
+# exclude_dirs = ["tests", "venv", ".venv"]
+# targets = ["src"]
+
+# Uncomment when enabling vulture in [project.optional-dependencies].dev.
+# [tool.vulture]
+# paths = ["src"]
+# exclude = ["tests/"]
+# min_confidence = 70
