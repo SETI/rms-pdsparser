@@ -203,6 +203,7 @@ def test_dict_api() -> None:
     assert list(label.items())[:18] == pairs
     assert list(label.keys())[:18] == [p[0] for p in pairs]
     assert list(label.values())[:18] == [p[1] for p in pairs]
+    assert list(label) == list(label.keys())
 
     assert label['PDS_VERSION_ID'] == 'PDS3'
     assert label.get('PDS_VERSION_ID', 'whatever') == 'PDS3'

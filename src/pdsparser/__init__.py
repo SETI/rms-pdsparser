@@ -516,6 +516,10 @@ class Pds3Label:
     def __contains__(self, key):
         return key in self.dict
 
+    def __iter__(self):
+        """Iterator over this dictionary's keys."""
+        return iter(self.dict)
+
     def get(self, key, default=None):
         """The value for key if key is in the label; otherwise, the specified default."""
         return self.dict.get(key, default)
