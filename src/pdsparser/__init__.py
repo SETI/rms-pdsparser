@@ -681,7 +681,7 @@ class Pds3Label:
     def as_dict(self):
         """This label as a Python dictionary. Part of the old PdsLabel API.
 
-        DEPRECATED; use the `dict_` attribute or apply the dict API directly to this
+        DEPRECATED; use the `dict` attribute or apply the dict API directly to this
         Pds3Label object.
 
         Note that this function matches the previous output of as_dict(). Specifically,
