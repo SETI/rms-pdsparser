@@ -250,6 +250,7 @@ The `pdsparser` module provides several additional utilities for handling PDS3 l
   old-style Vax variable-length records.
 """
 
+import copy
 import datetime as dt
 import pathlib
 import re
@@ -677,19 +678,22 @@ class Pds3Label:
         item_dict = self._as_item_dict(first_suffix=first_suffix)
         return from_item_dict(item_dict)
 
-    # Old, deprecated API
-    def as_dict(self):
-        """This label as a Python dictionary. Part of the old PdsLabel API.
+    def as_dict(self, *, old_format=False):
+        """This label content as a Python dictionary.
 
-        DEPRECATED; use the `dict` attribute or apply the dict API directly to this
-        Pds3Label object.
+        Parameters:
+            old_format (bool, optional): True to return a dictionary in the format of the
+                ``PdsLabel`` API of pdsparser v1, in which:
 
-        Note that this function matches the previous output of as_dict(). Specifically,
+                * dates, times, and datetimes are returned as strings in ISO format.
+                * file-offset pointers are returned as a tuple (filename, offset, unit).
+                * set values are returned as lists.
+                * units are omitted.
 
-        * dates, times, and datetimes are returned as strings in ISO format.
-        * file_offset_pointers are returned as a tuple (filename, offset, unit).
-        * set values are returns as lists.
-        * units are omitted.
+        Returns:
+            dict: The Python dictionary. If `old_format` is True, it has the v1 format;
+            otherwise, it is a deep copy of the ``dict`` attribute, so modifying it does
+            not modify this label.
         """
 
         def to_old_dict(dict_):
@@ -711,7 +715,10 @@ class Pds3Label:
                     old[key] = value
             return old
 
-        return to_old_dict(self.dict)
+        if old_format:
+            return to_old_dict(self.dict)
+
+        return copy.deepcopy(self.dict)
 
     @staticmethod
     def from_file(filename):

@@ -690,7 +690,18 @@ def test_blank_zoned_time(quote: str, zone: str, hms: str) -> None:
 
 def test_as_dict() -> None:
 
-    test_dict = Pds3Label(TEST_FILE_DIR / 'AS_DICT_TEST.LBL').as_dict()
+    label = Pds3Label(TEST_FILE_DIR / 'AS_DICT_TEST.LBL')
+    test_dict = label.as_dict()
+    assert test_dict == label.dict
+
+    # The result is a deep copy, so modifying a nested object leaves the label unchanged
+    test_dict['IMAGE']['LINES'] = -1
+    assert label['IMAGE']['LINES'] == 800
+
+
+def test_as_dict_old_format() -> None:
+
+    test_dict = Pds3Label(TEST_FILE_DIR / 'AS_DICT_TEST.LBL').as_dict(old_format=True)
 
     # This is the result of a run of the v1 module...
     old_answer = _answer('AS_DICT_TEST-as_dict.txt')
