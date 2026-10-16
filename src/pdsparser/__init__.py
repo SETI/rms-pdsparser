@@ -707,7 +707,7 @@ class Pds3Label:
                 elif isinstance(value, (dt.date, dt.time, dt.datetime)):
                     old[key] = dict_[key + '_fmt']
                 elif isinstance(value, set):
-                    old[key] = dict_[key + '_list']
+                    old[key + '_list'] = old[key] = dict_[key + '_list']
                 elif key + '_offset' in dict_:
                     old[key] = (value, dict_[key + '_offset'],
                                 'BYTES' if dict_[key + '_unit'] else 'RECORDS')
