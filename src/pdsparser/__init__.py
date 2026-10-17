@@ -687,7 +687,8 @@ class Pds3Label:
 
                 * dates, times, and datetimes are returned as strings in ISO format.
                 * file-offset pointers are returned as a tuple (filename, offset, unit).
-                * set values are returned as lists.
+                * set values are returned as lists, and each is also returned under
+                  the same key plus suffix "_list".
                 * units are omitted.
 
         Returns:

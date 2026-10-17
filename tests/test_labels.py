@@ -721,6 +721,11 @@ def test_as_dict_old_format() -> None:
     # old dicts do not contain END statement
     del test_dict['END']
 
+    # v1 dicts do not have "_list" entries for set values
+    for key in ('CUT_OUT_WINDOW', 'SOURCE_PRODUCT_ID', 'STOOGES', 'TRUTH_WINDOW'):
+        assert test_dict[key + '_list'] == test_dict[key]
+        del test_dict[key + '_list']
+
     assert test_dict == old_answer
 
 
