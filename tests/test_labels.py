@@ -132,6 +132,16 @@ def test_go_expanded(method: Method) -> None:
     assert label.dict == _answer('C052079-2800R-expanded.txt')
 
 
+@pytest.mark.parametrize('method', ['loose', 'fast'])
+def test_go_expanded_crlf_string(method: Method) -> None:
+    # Label content passed as one string with <CR><LF> line terminators
+    content = GO_LBL.read_bytes().decode('latin-1')
+    content = content.replace('\r\n', '\n').replace('\n', '\r\n')
+    label = Pds3Label(content, method=method, types=True, sources=True, expand=True,
+                      fmt_dirs=TEST_FILE_DIR)
+    assert label.dict == _answer('C052079-2800R-expanded.txt')
+
+
 ##########################################################################################
 # JNOJIR_xxxx, JNOJNC_0xxx, NHxxLO_xxxx
 ##########################################################################################

@@ -205,7 +205,7 @@ def expand_structures(content, fmt_dirs=[], *, repairs=[], label_path=None):
     """
 
     # Define key regular expressions
-    _STRUCTURE = re.compile(r' *\^[A-Z0-9_]*STRUCTURE *= *["|\'](.*?)["|\'] *\n')
+    _STRUCTURE = re.compile(r' *\^[A-Z0-9_]*STRUCTURE *= *["|\'](.*?)["|\'] *\r?\n')
     _END = re.compile(r' *END *\n*$')
 
     # Obtain the list of directories to search
